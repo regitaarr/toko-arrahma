@@ -363,6 +363,11 @@
             <div class="total-section">
                 <h3>Total Belanja</h3>
                 <div class="total-amount" id="totalAmount">Rp 0</div>
+                <div class="form-group" style="margin-top:15px;">
+                    <label for="discountAmount">Diskon (masukkan nominal):</label>
+                    <input type="number" id="discountAmount" placeholder="Masukkan diskon (Rp)" min="0" value="0" oninput="updateTotal()">
+                </div>
+                <div class="total-amount" id="finalTotalAmount" style="margin-top:10px; color:#e74c3c; font-size:1.3rem;">Total Setelah Diskon: Rp 0</div>
             </div>
 
             <h3>💳 Metode Pembayaran</h3>
@@ -539,8 +544,17 @@
 
     // Update total amount
     function updateTotal() {
-        currentTotal = cart.reduce((total, item) => total + (item.price * item.quantity), 0);
-        document.getElementById('totalAmount').textContent = `Rp ${currentTotal.toLocaleString()}`;
+        const discount = parseInt(document.getElementById('discountAmount')?.value) || 0;
+        let total = cart.reduce((total, item) => total + (item.price * item.quantity), 0);
+        if (discount > total) {
+            document.getElementById('discountAmount').value = total;
+            currentTotal = 0;
+        } else {
+            currentTotal = total - discount;
+        }
+        document.getElementById('totalAmount').textContent = `Rp ${total.toLocaleString()}`;
+        document.getElementById('finalTotalAmount').textContent = `Total Setelah Diskon: Rp ${currentTotal.toLocaleString()}`;
+        calculateChange();
     }
 
     // Select payment method
@@ -565,7 +579,11 @@
     // Calculate change for cash payment
     function calculateChange() {
         const cashAmount = parseInt(document.getElementById('cashAmount').value) || 0;
-        const change = cashAmount - currentTotal;
+        const discount = parseInt(document.getElementById('discountAmount')?.value) || 0;
+        let total = cart.reduce((total, item) => total + (item.price * item.quantity), 0);
+        let finalTotal = total - discount;
+        if (finalTotal < 0) finalTotal = 0;
+        const change = cashAmount - finalTotal;
         
         const changeElement = document.getElementById('changeAmount');
         if (change >= 0) {
@@ -588,10 +606,13 @@
             alert('Pilih metode pembayaran!');
             return;
         }
-
+        const discount = parseInt(document.getElementById('discountAmount')?.value) || 0;
+        let total = cart.reduce((total, item) => total + (item.price * item.quantity), 0);
+        let finalTotal = total - discount;
+        if (finalTotal < 0) finalTotal = 0;
         if (selectedPayment === 'cash') {
             const cashAmount = parseInt(document.getElementById('cashAmount').value) || 0;
-            if (cashAmount < currentTotal) {
+            if (cashAmount < finalTotal) {
                 alert('Jumlah uang tidak mencukupi!');
                 return;
             }
@@ -616,7 +637,9 @@
                 qty: item.quantity,
                 price: item.price
             })),
-            total: currentTotal,
+            total: total,
+            diskon: discount,
+            total_setelah_diskon: finalTotal,
             metode: selectedPayment
         };
         db.collection('transactions').add(transaksi)
@@ -660,6 +683,8 @@
         document.getElementById('cashCalculation').classList.remove('active');
         document.getElementById('cashAmount').value = '';
         document.getElementById('changeAmount').textContent = 'Kembalian: Rp 0';
+        document.getElementById('discountAmount').value = 0;
+        document.getElementById('finalTotalAmount').textContent = 'Total Setelah Diskon: Rp 0';
     }
 
     // Generate receipt
@@ -667,6 +692,10 @@
         const customerName = document.getElementById('customerName').value || 'Pelanggan';
         const now = new Date();
         const receiptNumber = 'TRX' + now.getFullYear() + (now.getMonth() + 1).toString().padStart(2, '0') + now.getDate().toString().padStart(2, '0') + now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
+        const discount = parseInt(document.getElementById('discountAmount')?.value) || 0;
+        let total = cart.reduce((total, item) => total + (item.price * item.quantity), 0);
+        let finalTotal = total - discount;
+        if (finalTotal < 0) finalTotal = 0;
         let receiptHTML = '';
         receiptHTML += `
             <div class="receipt">
@@ -703,12 +732,15 @@
         receiptHTML += `
                 </table>
                 <hr>
-                <p style="text-align: right;"><strong>TOTAL: Rp ${currentTotal.toLocaleString()}</strong></p>
-                <p style="text-align: right;"><strong>Bayar (${selectedPayment === 'cash' ? 'Tunai' : 'QRIS'}): Rp ${selectedPayment === 'cash' ? parseInt(document.getElementById('cashAmount').value).toLocaleString() : currentTotal.toLocaleString()}</strong></p>
+                <p style="text-align: right;"><strong>TOTAL: Rp ${total.toLocaleString()}</strong></p>
+                <p style="text-align: right;"><strong>DISKON: Rp ${discount.toLocaleString()}</strong></p>
+                <p style="text-align: right;"><strong>TOTAL SETELAH DISKON: Rp ${finalTotal.toLocaleString()}</strong></p>
+                <p style="text-align: right;"><strong>Bayar (${selectedPayment === 'cash' ? 'Tunai' : 'QRIS'}): Rp ${selectedPayment === 'cash' ? parseInt(document.getElementById('cashAmount').value).toLocaleString() : finalTotal.toLocaleString()}</strong></p>
         `;
 
         if (selectedPayment === 'cash') {
-            const change = parseInt(document.getElementById('cashAmount').value) - currentTotal;
+            const cashAmount = parseInt(document.getElementById('cashAmount').value) || 0;
+            const change = cashAmount - finalTotal;
             receiptHTML += `<p style="text-align: right;"><strong>Kembalian: Rp ${change.toLocaleString()}</strong></p>`;
         }
 
