@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stok Barang - Toko Arrahma</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Stok Barang</h1>
+            <nav style="margin-bottom:16px;">
+                <a href="tambah_barang.html" class="btn">Tambah Barang</a>
+                <a href="kasir.html" class="btn">Transaksi</a>
+            </nav>
+        </div>
+        <div style="margin-bottom:16px;">
+            <label for="kategoriDropdown" style="font-weight:bold;">Filter Kategori:</label>
+            <select id="kategoriDropdown" style="padding:8px 12px;border-radius:8px;border:1px solid #ccc;">
+                <option value="">Semua Kategori</option>
+            </select>
+        </div>
+        <div class="panel">
+            <h2>Daftar Stok Barang</h2>
+            <table class="table" id="stokTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nama</th>
+                        <th>Kategori</th>
+                        <th>Harga</th>
+                        <th>Stok</th>
+                        <th>Aksi</th>
+                    </tr>
+                </thead>
+                <tbody id="stokTableBody">
+                    <!-- Data diisi dari Firestore -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyADPQ_EU2m4s4HNDYFkid03osfUfiEUmUs",
+      authDomain: "web-toko-40273.firebaseapp.com",
+      projectId: "web-toko-40273",
+      storageBucket: "web-toko-40273.firebasestorage.app",
+      messagingSenderId: "207266690704",
+      appId: "1:207266690704:web:bcc5d16b6c9e3780088a15",
+      measurementId: "G-EGDRL1NKXZ"
+    };
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    const db = firebase.firestore();
+    const kategoriDropdown = document.getElementById('kategoriDropdown');
+    const stokTableBody = document.getElementById('stokTableBody');
+    let allProducts = [];
+    let allDocs = [];
+
+    function renderKategoriDropdown(products) {
+        const kategoriSet = new Set(products.map(p => p.type));
+        kategoriDropdown.innerHTML = '<option value="">Semua Kategori</option>';
+        kategoriSet.forEach(kat => {
+            if (kat) kategoriDropdown.innerHTML += `<option value="${kat}">${kat}</option>`;
+        });
+    }
+
+    function renderStokTable(products, kategori) {
+        stokTableBody.innerHTML = '';
+        products.filter(p => !kategori || p.type === kategori).forEach((item, idx) => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td><input type="text" value="${item.id}" style="width:80px" disabled></td>
+                <td><input type="text" value="${item.name}" id="name${idx}" style="width:120px"></td>
+                <td><input type="text" value="${item.type}" id="type${idx}" style="width:100px"></td>
+                <td><input type="number" value="${item.price}" id="price${idx}" style="width:80px"></td>
+                <td><input type="number" value="${item.stock}" id="stock${idx}" style="width:60px"></td>
+                <td>
+                    <button onclick="updateProduct(${idx})" class="btn btn-success" style="margin-bottom:4px;">Simpan</button>
+                    <button onclick="deleteProduct(${idx})" class="btn btn-danger">Hapus</button>
+                </td>
+            `;
+            stokTableBody.appendChild(row);
+        });
+    }
+
+    function listenProducts() {
+        db.collection('products').onSnapshot(snapshot => {
+            allProducts = snapshot.docs.map(doc => doc.data());
+            allDocs = snapshot.docs.map(doc => doc.id);
+            renderKategoriDropdown(allProducts);
+            renderStokTable(allProducts, kategoriDropdown.value);
+        });
+    }
+
+    kategoriDropdown.addEventListener('change', function() {
+        renderStokTable(allProducts, kategoriDropdown.value);
+    });
+
+    window.updateProduct = function(idx) {
+        const docId = allDocs[idx];
+        const name = document.getElementById('name'+idx).value;
+        const type = document.getElementById('type'+idx).value;
+        const price = parseInt(document.getElementById('price'+idx).value);
+        const stock = parseInt(document.getElementById('stock'+idx).value);
+        db.collection('products').doc(docId).update({name, type, price, stock})
+          .then(() => alert('Barang berhasil diupdate!'))
+          .catch(err => alert('Gagal update: ' + err.message));
+    }
+
+    window.deleteProduct = function(idx) {
+        if (!confirm('Yakin ingin menghapus barang ini?')) return;
+        const docId = allDocs[idx];
+        db.collection('products').doc(docId).delete()
+          .then(() => alert('Barang berhasil dihapus!'))
+          .catch(err => alert('Gagal hapus: ' + err.message));
+    }
+
+    listenProducts();
+    </script>
+</body>
+</html> 

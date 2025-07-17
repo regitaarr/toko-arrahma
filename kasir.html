@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kasir - Toko Arrahma</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .back-btn {
+            background: #3498db;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin-bottom: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .back-btn:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .panel h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.8rem;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #34495e;
+            font-weight: bold;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ecf0f1;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #3498db 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            text-decoration: none;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+        }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .table th, .table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        .table th {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
+            font-weight: bold;
+        }
+
+        .table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .checkout-section {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .total-section {
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .total-section h3 {
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+        }
+
+        .total-amount {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+
+        .payment-methods {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .payment-method {
+            flex: 1;
+            padding: 15px;
+            background: #f8f9fa;
+            border: 2px solid #ecf0f1;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .payment-method:hover {
+            border-color: #3498db;
+            background: #e3f2fd;
+        }
+
+        .payment-method.active {
+            border-color: #27ae60;
+            background: #e8f5e8;
+        }
+
+        .cash-calculation {
+            background: #fff3cd;
+            border: 2px solid #ffeaa7;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .cash-calculation.active {
+            display: block;
+        }
+
+        .change-amount {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #27ae60;
+            margin-top: 10px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background: white;
+            margin: 5% auto;
+            padding: 30px;
+            border-radius: 20px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        .close:hover {
+            color: #e74c3c;
+        }
+
+        .receipt {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            border: 2px dashed #bdc3c7;
+            font-family: 'Courier New', monospace;
+        }
+
+        .receipt h3 {
+            text-align: center;
+            margin-bottom: 15px;
+            color: #2c3e50;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .payment-methods {
+                flex-direction: column;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="index.html" class="back-btn">← Kembali ke Beranda</a>
+            <h1>Kasir - Toko Arrahma</h1>
+        </div>
+        <nav style="margin-bottom:16px;">
+            <a href="tambah_barang.html" class="btn">Tambah Barang</a>
+            <a href="stok_barang.html" class="btn">Cek/Edit Stok</a>
+            <a href="kasir.html" class="btn">Transaksi</a>
+        </nav>
+        <!-- Hapus dropdown kategori dan tabel stok barang di bawah ini -->
+
+        <!-- Checkout Section -->
+        <div class="checkout-section">
+            <h2>🛒 Checkout</h2>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div>
+                    <div class="form-group">
+                        <label for="customerName">Nama Pelanggan:</label>
+                        <input type="text" id="customerName" placeholder="Masukkan nama pelanggan">
+                    </div>
+                    <div class="form-group">
+                        <label for="selectCategory">Pilih Kategori:</label>
+                        <select id="selectCategory" style="margin-bottom:10px;">
+                            <option value="">Pilih kategori</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="selectItem">Pilih Barang:</label>
+                        <select id="selectItem">
+                            <option value="">Pilih barang</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="quantity">Jumlah:</label>
+                        <input type="number" id="quantity" min="1" placeholder="Masukkan jumlah">
+                    </div>
+                    <button class="btn btn-success" onclick="addToCart()">Tambah ke Keranjang</button>
+                </div>
+                <div>
+                    <h3>🛍️ Keranjang Belanja</h3>
+                    <table class="table" id="cartTable">
+                        <thead>
+                            <tr>
+                                <th>Barang</th>
+                                <th>Qty</th>
+                                <th>Harga</th>
+                                <th>Subtotal</th>
+                                <th>Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cartBody">
+                            <!-- Data keranjang akan diisi oleh JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="total-section">
+                <h3>Total Belanja</h3>
+                <div class="total-amount" id="totalAmount">Rp 0</div>
+            </div>
+
+            <h3>💳 Metode Pembayaran</h3>
+            <div class="payment-methods">
+                <div class="payment-method" onclick="selectPayment('cash')">
+                    <h4>💰 Tunai</h4>
+                    <p>Bayar dengan uang tunai</p>
+                </div>
+                <div class="payment-method" onclick="selectPayment('qris')">
+                    <h4>📱 QRIS</h4>
+                    <p>Bayar dengan scan QR</p>
+                </div>
+            </div>
+
+            <div class="cash-calculation" id="cashCalculation">
+                <h4>💰 Pembayaran Tunai</h4>
+                <div class="form-group">
+                    <label for="cashAmount">Jumlah Uang yang Diterima:</label>
+                    <input type="number" id="cashAmount" placeholder="Masukkan jumlah uang" oninput="calculateChange()">
+                </div>
+                <div class="change-amount" id="changeAmount">Kembalian: Rp 0</div>
+            </div>
+
+            <button class="btn btn-warning" onclick="processPayment()" style="font-size: 1.2rem; padding: 15px 30px; margin-top: 20px;">
+                🧾 Proses Pembayaran
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal untuk Receipt -->
+    <div id="receiptModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeReceipt()">&times;</span>
+            <div id="receiptContent">
+                <!-- Receipt akan diisi oleh JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase App (the core Firebase SDK) -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script>
+      // Konfigurasi Firebase
+      const firebaseConfig = {
+        apiKey: "AIzaSyADPQ_EU2m4s4HNDYFkid03osfUfiEUmUs",
+        authDomain: "web-toko-40273.firebaseapp.com",
+        projectId: "web-toko-40273",
+        storageBucket: "web-toko-40273.firebasestorage.app",
+        messagingSenderId: "207266690704",
+        appId: "1:207266690704:web:bcc5d16b6c9e3780088a15",
+        measurementId: "G-EGDRL1NKXZ"
+      };
+      if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+      }
+      const db = firebase.firestore();
+    </script>
+    <script>
+    // Data storage
+    let inventory = [];
+    let cart = [];
+    let selectedPayment = '';
+    let currentTotal = 0;
+
+    // Ambil data produk dari Firestore dan tampilkan di tabel stok barang
+    const selectCategory = document.getElementById('selectCategory');
+    const selectItem = document.getElementById('selectItem');
+    let firestoreProducts = [];
+
+    function updateCategoryDropdown() {
+        const kategoriSet = new Set(firestoreProducts.map(p => p.type));
+        selectCategory.innerHTML = '<option value="">Pilih kategori</option>';
+        kategoriSet.forEach(kat => {
+            if (kat) selectCategory.innerHTML += `<option value="${kat}">${kat}</option>`;
+        });
+    }
+
+    function updateItemSelectFromFirestore() {
+        const kategori = selectCategory.value;
+        selectItem.innerHTML = '<option value="">Pilih barang</option>';
+        selectItem.disabled = !kategori;
+        if (!kategori) return;
+        firestoreProducts.filter(item => item.type === kategori && item.stock > 0).forEach(item => {
+            selectItem.innerHTML += `<option value="${item.id}">${item.name} - Rp ${item.price.toLocaleString()} (Stok: ${item.stock})</option>`;
+        });
+    }
+
+    db.collection('products').onSnapshot(snapshot => {
+        firestoreProducts = snapshot.docs.map(doc => doc.data());
+        updateCategoryDropdown();
+        updateItemSelectFromFirestore();
+    });
+
+    selectCategory.addEventListener('change', updateItemSelectFromFirestore);
+
+    // Add item to cart
+    function addToCart() {
+        const itemId = document.getElementById('selectItem').value;
+        const quantity = parseInt(document.getElementById('quantity').value);
+
+        if (!itemId) {
+            alert('Pilih barang terlebih dahulu!');
+            return;
+        }
+
+        if (!quantity || quantity <= 0) {
+            alert('Masukkan jumlah yang valid!');
+            return;
+        }
+
+        const item = firestoreProducts.find(i => i.id === itemId);
+        if (!item) {
+            alert('Barang tidak ditemukan!');
+            return;
+        }
+
+        if (quantity > item.stock) {
+            alert(`Stok tidak mencukupi! Stok tersedia: ${item.stock}`);
+            return;
+        }
+
+        // Check if item already in cart
+        const existingCartItem = cart.find(c => c.id === itemId);
+        if (existingCartItem) {
+            if (existingCartItem.quantity + quantity > item.stock) {
+                alert(`Total quantity melebihi stok! Stok tersedia: ${item.stock}`);
+                return;
+            }
+            existingCartItem.quantity += quantity;
+        } else {
+            cart.push({
+                id: itemId,
+                name: item.name,
+                price: item.price,
+                quantity: quantity
+            });
+        }
+
+        updateCartTable();
+        updateTotal();
+        
+        // Clear form
+        document.getElementById('selectItem').value = '';
+        document.getElementById('quantity').value = '';
+    }
+
+    // Update cart table
+    function updateCartTable() {
+        const tbody = document.getElementById('cartBody');
+        tbody.innerHTML = '';
+
+        cart.forEach((item, index) => {
+            const subtotal = item.price * item.quantity;
+            const row = tbody.insertRow();
+            row.innerHTML = `
+                <td>${item.name}</td>
+                <td>${item.quantity}</td>
+                <td>Rp ${item.price.toLocaleString()}</td>
+                <td>Rp ${subtotal.toLocaleString()}</td>
+                <td>
+                    <button class="btn btn-danger" onclick="removeFromCart(${index})">Hapus</button>
+                </td>
+            `;
+        });
+    }
+
+    // Remove item from cart
+    function removeFromCart(index) {
+        cart.splice(index, 1);
+        updateCartTable();
+        updateTotal();
+    }
+
+    // Update total amount
+    function updateTotal() {
+        currentTotal = cart.reduce((total, item) => total + (item.price * item.quantity), 0);
+        document.getElementById('totalAmount').textContent = `Rp ${currentTotal.toLocaleString()}`;
+    }
+
+    // Select payment method
+    function selectPayment(method) {
+        selectedPayment = method;
+        
+        // Update UI
+        document.querySelectorAll('.payment-method').forEach(el => {
+            el.classList.remove('active');
+        });
+        event.target.closest('.payment-method').classList.add('active');
+
+        // Show/hide cash calculation
+        const cashCalc = document.getElementById('cashCalculation');
+        if (method === 'cash') {
+            cashCalc.classList.add('active');
+        } else {
+            cashCalc.classList.remove('active');
+        }
+    }
+
+    // Calculate change for cash payment
+    function calculateChange() {
+        const cashAmount = parseInt(document.getElementById('cashAmount').value) || 0;
+        const change = cashAmount - currentTotal;
+        
+        const changeElement = document.getElementById('changeAmount');
+        if (change >= 0) {
+            changeElement.textContent = `Kembalian: Rp ${change.toLocaleString()}`;
+            changeElement.style.color = '#27ae60';
+        } else {
+            changeElement.textContent = `Kurang: Rp ${Math.abs(change).toLocaleString()}`;
+            changeElement.style.color = '#e74c3c';
+        }
+    }
+
+    // Process payment
+    function processPayment() {
+        if (cart.length === 0) {
+            alert('Keranjang belanja kosong!');
+            return;
+        }
+
+        if (!selectedPayment) {
+            alert('Pilih metode pembayaran!');
+            return;
+        }
+
+        if (selectedPayment === 'cash') {
+            const cashAmount = parseInt(document.getElementById('cashAmount').value) || 0;
+            if (cashAmount < currentTotal) {
+                alert('Jumlah uang tidak mencukupi!');
+                return;
+            }
+        }
+
+        // Update stock
+        cart.forEach(cartItem => {
+            const inventoryItem = inventory.find(item => item.id === cartItem.id);
+            if (inventoryItem) {
+                inventoryItem.stock -= cartItem.quantity;
+            }
+        });
+
+        // SIMPAN TRANSAKSI KE FIRESTORE
+        const kasirEmail = sessionStorage.getItem('kasir_email') || 'unknown';
+        const transaksi = {
+            waktu: new Date().toISOString(),
+            kasir: kasirEmail,
+            items: cart.map(item => ({
+                id: item.id,
+                name: item.name,
+                qty: item.quantity,
+                price: item.price
+            })),
+            total: currentTotal,
+            metode: selectedPayment
+        };
+        db.collection('transactions').add(transaksi)
+          .then(() => {
+            alert('Transaksi berhasil disimpan ke database!');
+          })
+          .catch((err) => {
+            alert('Gagal simpan transaksi ke database: ' + err.message);
+          });
+
+        // Update stok di Firestore
+        const updatePromises = cart.map(cartItem => {
+            const productRef = db.collection('products').where('id', '==', cartItem.id);
+            return productRef.get().then(snapshot => {
+                if (!snapshot.empty) {
+                    const doc = snapshot.docs[0];
+                    const newStock = (doc.data().stock || 0) - cartItem.quantity;
+                    return db.collection('products').doc(doc.id).update({ stock: newStock });
+                }
+            });
+        });
+        Promise.all(updatePromises).catch(err => {
+            alert('Gagal update stok barang: ' + err.message);
+        });
+
+        // Generate receipt
+        generateReceipt();
+        
+        // Clear cart and form
+        cart = [];
+        updateCartTable();
+        updateTotal();
+        updateInventoryTable();
+        updateItemSelect();
+        
+        // Reset payment
+        selectedPayment = '';
+        document.querySelectorAll('.payment-method').forEach(el => {
+            el.classList.remove('active');
+        });
+        document.getElementById('cashCalculation').classList.remove('active');
+        document.getElementById('cashAmount').value = '';
+        document.getElementById('changeAmount').textContent = 'Kembalian: Rp 0';
+    }
+
+    // Generate receipt
+    function generateReceipt() {
+        const customerName = document.getElementById('customerName').value || 'Pelanggan';
+        const now = new Date();
+        const receiptNumber = 'TRX' + now.getFullYear() + (now.getMonth() + 1).toString().padStart(2, '0') + now.getDate().toString().padStart(2, '0') + now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
+        let receiptHTML = '';
+        receiptHTML += `
+            <div class="receipt">
+                <h3>🛒 TOKO ARRAHMA</h3>
+                <p style="text-align: center; margin-bottom: 20px;">Kubangpari 02/02, Bangunsari, Pamarican, Ciamis, Jawa Barat <br>Whatsapp: 081461220151</p>
+                <hr>
+                <p><strong>No. Transaksi:</strong> ${receiptNumber}</p>
+                <p><strong>Tanggal:</strong> ${now.toLocaleDateString('id-ID')}</p>
+                <p><strong>Waktu:</strong> ${now.toLocaleTimeString('id-ID')}</p>
+                <p><strong>Kasir:</strong> Admin</p>
+                <p><strong>Pelanggan:</strong> ${customerName}</p>
+                <hr>
+                <table style="width: 100%; margin: 10px 0;">
+                    <tr>
+                        <th style="text-align: left;">Barang</th>
+                        <th style="text-align: right;">Qty</th>
+                        <th style="text-align: right;">Harga</th>
+                        <th style="text-align: right;">Subtotal</th>
+                    </tr>
+        `;
+
+        cart.forEach(item => {
+            const subtotal = item.price * item.quantity;
+            receiptHTML += `
+                <tr>
+                    <td>${item.name}</td>
+                    <td style="text-align: right;">${item.quantity}</td>
+                    <td style="text-align: right;">Rp ${item.price.toLocaleString()}</td>
+                    <td style="text-align: right;">Rp ${subtotal.toLocaleString()}</td>
+                </tr>
+            `;
+        });
+
+        receiptHTML += `
+                </table>
+                <hr>
+                <p style="text-align: right;"><strong>TOTAL: Rp ${currentTotal.toLocaleString()}</strong></p>
+                <p style="text-align: right;"><strong>Bayar (${selectedPayment === 'cash' ? 'Tunai' : 'QRIS'}): Rp ${selectedPayment === 'cash' ? parseInt(document.getElementById('cashAmount').value).toLocaleString() : currentTotal.toLocaleString()}</strong></p>
+        `;
+
+        if (selectedPayment === 'cash') {
+            const change = parseInt(document.getElementById('cashAmount').value) - currentTotal;
+            receiptHTML += `<p style="text-align: right;"><strong>Kembalian: Rp ${change.toLocaleString()}</strong></p>`;
+        }
+
+        receiptHTML += `
+                <hr>
+                <p style="text-align: center; margin-top: 15px;">Terima kasih atas kunjungan Anda!<br>Barang yang sudah dibeli tidak dapat ditukar</p>
+            </div>
+        `;
+
+        document.getElementById('receiptContent').innerHTML = receiptHTML;
+        document.getElementById('receiptModal').style.display = 'block';
+    }
+
+    // Close receipt modal
+    function closeReceipt() {
+        document.getElementById('receiptModal').style.display = 'none';
+    }
+
+    // Close modal when clicking outside
+    window.onclick = function(event) {
+        const modal = document.getElementById('receiptModal');
+        if (event.target == modal) {
+            modal.style.display = 'none';
+        }
+    }
+</script>
+</body>
+</html>
