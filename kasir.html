@@ -312,6 +312,19 @@
             <a href="stok_barang.html" class="btn">Cek/Edit Stok</a>
             <a href="kasir.html" class="btn">Transaksi</a>
         </nav>
+        <!-- Laporan Penjualan -->
+        <div class="panel" style="margin-bottom:20px;">
+            <h2>📄 Laporan Penjualan</h2>
+            <div class="form-group">
+                <label for="reportStart">Tanggal Mulai</label>
+                <input type="date" id="reportStart">
+            </div>
+            <div class="form-group">
+                <label for="reportEnd">Tanggal Selesai</label>
+                <input type="date" id="reportEnd">
+            </div>
+            <button class="btn" onclick="downloadSalesPdf()">Unduh Laporan (PDF)</button>
+        </div>
         <!-- Hapus dropdown kategori dan tabel stok barang di bawah ini -->
 
         <!-- Checkout Section -->
@@ -410,6 +423,8 @@
     <!-- Firebase App (the core Firebase SDK) -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     <script>
       // Konfigurasi Firebase
       const firebaseConfig = {
@@ -631,6 +646,7 @@
         const transaksi = {
             waktu: new Date().toISOString(),
             kasir: kasirEmail,
+            pelanggan: (document.getElementById('customerName').value || ''),
             items: cart.map(item => ({
                 id: item.id,
                 name: item.name,
@@ -765,6 +781,120 @@
         if (event.target == modal) {
             modal.style.display = 'none';
         }
+    }
+
+    // Unduh Laporan Penjualan PDF berdasarkan tanggal
+    async function downloadSalesPdf() {
+        const startInput = document.getElementById('reportStart').value;
+        const endInput = document.getElementById('reportEnd').value;
+        if (!startInput || !endInput) {
+            alert('Pilih tanggal mulai dan tanggal selesai.');
+            return;
+        }
+        const start = new Date(startInput);
+        const end = new Date(endInput);
+        end.setHours(23,59,59,999);
+        if (start > end) {
+            alert('Rentang tanggal tidak valid.');
+            return;
+        }
+
+        // Ambil transaksi dari Firestore
+        let snapshot;
+        try {
+            snapshot = await db.collection('transactions').get();
+        } catch (err) {
+            alert('Gagal mengambil data transaksi: ' + err.message);
+            return;
+        }
+        const trx = snapshot.docs.map(doc => doc.data())
+            .filter(t => {
+                const w = t.waktu ? new Date(t.waktu) : null;
+                return w && w >= start && w <= end;
+            })
+            .sort((a,b) => new Date(a.waktu) - new Date(b.waktu));
+
+        const totalTransaksi = trx.length;
+        const totalOmzet = trx.reduce((sum, t) => sum + (Number(t.total_setelah_diskon ?? t.total ?? 0)), 0);
+
+        if (!window.jspdf || !window.jspdf.jsPDF) {
+            alert('Pustaka PDF belum termuat. Coba muat ulang halaman.');
+            return;
+        }
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+
+        // Header
+        doc.setFontSize(16);
+        doc.text('Laporan Penjualan - Toko Arrahma', 40, 40);
+        doc.setFontSize(11);
+        doc.text(`Periode: ${start.toLocaleDateString('id-ID')} s.d. ${end.toLocaleDateString('id-ID')}`, 40, 60);
+        doc.text(`Total Transaksi: ${totalTransaksi}`, 40, 76);
+        doc.text(`Total Omzet: Rp ${totalOmzet.toLocaleString('id-ID')}`, 40, 92);
+        const currentKasir = sessionStorage.getItem('kasir_email') || '-';
+        doc.text(`Kasir: ${currentKasir}`, 40, 108);
+
+        // Detail per item: Tanggal, Pembeli, Barang, Qty, Harga, Subtotal
+        if (typeof doc.autoTable !== 'function') {
+            alert('Plugin AutoTable belum aktif. Muat ulang halaman dan coba lagi.');
+            return;
+        }
+        const head = [['Tanggal', 'Pembeli', 'Metode', 'Barang', 'Qty', 'Harga', 'Subtotal']];
+        const body = [];
+        let itemsGrandTotal = 0;
+        trx.forEach(t => {
+            const tanggal = new Date(t.waktu).toLocaleString('id-ID');
+            const pembeli = t.pelanggan || '-';
+            const metode = (t.metode || '-').toUpperCase();
+            (t.items || []).forEach(it => {
+                const qty = Number(it.qty || 0);
+                const harga = Number(it.price || 0);
+                const subtotal = qty * harga;
+                itemsGrandTotal += subtotal;
+                body.push([
+                    tanggal,
+                    pembeli,
+                    metode,
+                    it.name || '-',
+                    String(qty),
+                    `Rp ${harga.toLocaleString('id-ID')}`,
+                    `Rp ${subtotal.toLocaleString('id-ID')}`
+                ]);
+            });
+        });
+        doc.autoTable({
+            head, body, startY: 130,
+            styles: { fontSize: 8, overflow: 'linebreak', cellPadding: 3 }, headStyles: { fillColor: [52, 152, 219] },
+            margin: { left: 40, right: 40 },
+            tableWidth: 'wrap',
+            columnStyles: {
+                0: { cellWidth: 95 },   // Tanggal
+                1: { cellWidth: 85 },   // Pembeli
+                2: { cellWidth: 60 },   // Metode
+                3: { cellWidth: 140 },  // Barang
+                4: { cellWidth: 35, halign: 'right' }, // Qty
+                5: { cellWidth: 55, halign: 'right' }, // Harga
+                6: { cellWidth: 75, halign: 'right' }  // Subtotal
+            },
+            foot: [[ '', '', '', '', '', 'Subtotal', `Rp ${itemsGrandTotal.toLocaleString('id-ID')}` ]],
+            footStyles: { fillColor: [236, 240, 241], textColor: [44, 62, 80], fontStyle: 'bold' },
+            didDrawPage: function() {
+                const pageSize = doc.internal.pageSize;
+                const pageWidth = pageSize.getWidth();
+                const pageNumber = doc.internal.getNumberOfPages();
+                doc.setFontSize(9);
+                doc.text(`Halaman ${pageNumber}`, pageWidth - 40, pageSize.getHeight() - 20, { align: 'right' });
+            }
+        });
+
+        // Simpan
+        const y = start.getFullYear();
+        const m = String(start.getMonth()+1).padStart(2,'0');
+        const d = String(start.getDate()).padStart(2,'0');
+        const y2 = end.getFullYear();
+        const m2 = String(end.getMonth()+1).padStart(2,'0');
+        const d2 = String(end.getDate()).padStart(2,'0');
+        doc.save(`laporan_penjualan_${y}${m}${d}_${y2}${m2}${d2}.pdf`);
     }
 </script>
 </body>

@@ -15,11 +15,21 @@
                 <a href="kasir.html" class="btn">Transaksi</a>
             </nav>
         </div>
-        <div style="margin-bottom:16px;">
-            <label for="kategoriDropdown" style="font-weight:bold;">Filter Kategori:</label>
-            <select id="kategoriDropdown" style="padding:8px 12px;border-radius:8px;border:1px solid #ccc;">
-                <option value="">Semua Kategori</option>
-            </select>
+        <div style="margin-bottom:16px; display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+            <div>
+                <label for="kategoriDropdown" style="font-weight:bold;">Filter Kategori:</label>
+                <select id="kategoriDropdown" style="padding:8px 12px;border-radius:8px;border:1px solid #ccc;">
+                    <option value="">Semua Kategori</option>
+                </select>
+            </div>
+            <div>
+                <label for="searchInput" style="font-weight:bold;">Cari Nama:</label>
+                <input id="searchInput" type="text" placeholder="Ketik nama barang..." style="padding:8px 12px;border-radius:8px;border:1px solid #ccc; min-width:220px;">
+            </div>
+            <div>
+                <label style="font-weight:bold; visibility:hidden; display:block;">.</label>
+                <button class="btn" onclick="downloadStockPdf()">Unduh Stok (PDF)</button>
+            </div>
         </div>
         <div class="panel">
             <h2>Daftar Stok Barang</h2>
@@ -42,6 +52,8 @@
     </div>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     <script>
     const firebaseConfig = {
       apiKey: "AIzaSyADPQ_EU2m4s4HNDYFkid03osfUfiEUmUs",
@@ -58,8 +70,9 @@
     const db = firebase.firestore();
     const kategoriDropdown = document.getElementById('kategoriDropdown');
     const stokTableBody = document.getElementById('stokTableBody');
+    const searchInput = document.getElementById('searchInput');
     let allProducts = [];
-    let allDocs = [];
+    
 
     function renderKategoriDropdown(products) {
         const kategoriSet = new Set(products.map(p => p.type));
@@ -69,55 +82,115 @@
         });
     }
 
-    function renderStokTable(products, kategori) {
+    function renderStokTable(products, kategori, keyword) {
         stokTableBody.innerHTML = '';
-        products.filter(p => !kategori || p.type === kategori).forEach((item, idx) => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td><input type="text" value="${item.id}" style="width:80px" disabled></td>
-                <td><input type="text" value="${item.name}" id="name${idx}" style="width:120px"></td>
-                <td><input type="text" value="${item.type}" id="type${idx}" style="width:100px"></td>
-                <td><input type="number" value="${item.price}" id="price${idx}" style="width:80px"></td>
-                <td><input type="number" value="${item.stock}" id="stock${idx}" style="width:60px"></td>
-                <td>
-                    <button onclick="updateProduct(${idx})" class="btn btn-success" style="margin-bottom:4px;">Simpan</button>
-                    <button onclick="deleteProduct(${idx})" class="btn btn-danger">Hapus</button>
-                </td>
-            `;
-            stokTableBody.appendChild(row);
-        });
+        const q = (keyword || '').toLowerCase();
+        products
+            .filter(p => (!kategori || p.type === kategori))
+            .filter(p => (!q || (p.name || '').toLowerCase().includes(q)))
+            .sort((a, b) => (a.name || '').localeCompare((b.name || ''), 'id', { sensitivity: 'base' }))
+            .forEach((item) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><input type="text" value="${item.id}" style="width:80px" disabled></td>
+                    <td><input type="text" value="${item.name}" id="name_${item.__docId}" style="width:180px"></td>
+                    <td><input type="text" value="${item.type}" id="type_${item.__docId}" style="width:120px"></td>
+                    <td><input type="number" value="${item.price}" id="price_${item.__docId}" style="width:100px"></td>
+                    <td><input type="number" value="${item.stock}" id="stock_${item.__docId}" style="width:80px"></td>
+                    <td>
+                        <button onclick="updateProduct('${item.__docId}')" class="btn btn-success" style="margin-bottom:4px;">Simpan</button>
+                        <button onclick="deleteProduct('${item.__docId}')" class="btn btn-danger">Hapus</button>
+                    </td>
+                `;
+                stokTableBody.appendChild(row);
+            });
     }
 
     function listenProducts() {
         db.collection('products').onSnapshot(snapshot => {
-            allProducts = snapshot.docs.map(doc => doc.data());
-            allDocs = snapshot.docs.map(doc => doc.id);
+            allProducts = snapshot.docs.map(doc => ({...doc.data(), __docId: doc.id}));
             renderKategoriDropdown(allProducts);
-            renderStokTable(allProducts, kategoriDropdown.value);
+            renderStokTable(allProducts, kategoriDropdown.value, searchInput.value);
         });
     }
 
     kategoriDropdown.addEventListener('change', function() {
-        renderStokTable(allProducts, kategoriDropdown.value);
+        renderStokTable(allProducts, kategoriDropdown.value, searchInput.value);
     });
 
-    window.updateProduct = function(idx) {
-        const docId = allDocs[idx];
-        const name = document.getElementById('name'+idx).value;
-        const type = document.getElementById('type'+idx).value;
-        const price = parseInt(document.getElementById('price'+idx).value);
-        const stock = parseInt(document.getElementById('stock'+idx).value);
+    searchInput.addEventListener('input', function() {
+        renderStokTable(allProducts, kategoriDropdown.value, searchInput.value);
+    });
+
+    window.updateProduct = function(docId) {
+        const name = document.getElementById('name_'+docId).value;
+        const type = document.getElementById('type_'+docId).value;
+        const price = parseInt(document.getElementById('price_'+docId).value);
+        const stock = parseInt(document.getElementById('stock_'+docId).value);
         db.collection('products').doc(docId).update({name, type, price, stock})
           .then(() => alert('Barang berhasil diupdate!'))
           .catch(err => alert('Gagal update: ' + err.message));
     }
 
-    window.deleteProduct = function(idx) {
+    window.deleteProduct = function(docId) {
         if (!confirm('Yakin ingin menghapus barang ini?')) return;
-        const docId = allDocs[idx];
         db.collection('products').doc(docId).delete()
           .then(() => alert('Barang berhasil dihapus!'))
           .catch(err => alert('Gagal hapus: ' + err.message));
+    }
+
+    
+
+    window.downloadStockPdf = function() {
+        if (!window.jspdf || !window.jspdf.jsPDF || !window.jspdf.jsPDF.prototype || typeof window.jspdf.jsPDF !== 'function' || !window.jspdf.jsPDF) {
+            alert('Gagal memuat pustaka PDF. Pastikan koneksi internet aktif lalu coba lagi.');
+            return;
+        }
+        const kategori = kategoriDropdown.value;
+        const q = (searchInput.value || '').toLowerCase();
+        const filtered = allProducts
+            .filter(p => (!kategori || p.type === kategori))
+            .filter(p => (!q || (p.name || '').toLowerCase().includes(q)))
+            .sort((a, b) => (a.name || '').localeCompare((b.name || ''), 'id', { sensitivity: 'base' }));
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+
+        const title = 'Daftar Stok (Nama & Harga)';
+        doc.setFontSize(14);
+        doc.text(title, 40, 40);
+
+        const head = [['Nama', 'Harga']];
+        const body = filtered.map(p => [p.name || '', `Rp ${Number(p.price || 0).toLocaleString('id-ID')}`]);
+
+        if (typeof doc.autoTable !== 'function') {
+            alert('Fitur tabel PDF belum siap. Muat ulang halaman agar plugin AutoTable aktif.');
+            return;
+        }
+        doc.autoTable({
+            head,
+            body,
+            startY: 60,
+            styles: { fontSize: 10 },
+            headStyles: { fillColor: [52, 152, 219] },
+            columnStyles: {
+                0: { cellWidth: 320 },
+                1: { halign: 'right' }
+            },
+            didDrawPage: function(data) {
+                const pageSize = doc.internal.pageSize;
+                const pageWidth = pageSize.getWidth();
+                const footer = `Halaman ${doc.internal.getNumberOfPages()}`;
+                doc.setFontSize(9);
+                doc.text(footer, pageWidth - 40, pageSize.getHeight() - 20, { align: 'right' });
+            }
+        });
+
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth()+1).padStart(2,'0');
+        const d = String(now.getDate()).padStart(2,'0');
+        doc.save(`stok_nama_harga_${y}${m}${d}.pdf`);
     }
 
     listenProducts();
