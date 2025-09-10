@@ -82,6 +82,7 @@
         products
             .filter(p => (!kategori || p.type === kategori))
             .filter(p => (!q || (p.name || '').toLowerCase().includes(q)))
+            .sort((a, b) => (a.name || '').localeCompare((b.name || ''), 'id', { sensitivity: 'base' }))
             .forEach((item) => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
