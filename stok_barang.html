@@ -15,11 +15,17 @@
                 <a href="kasir.html" class="btn">Transaksi</a>
             </nav>
         </div>
-        <div style="margin-bottom:16px;">
-            <label for="kategoriDropdown" style="font-weight:bold;">Filter Kategori:</label>
-            <select id="kategoriDropdown" style="padding:8px 12px;border-radius:8px;border:1px solid #ccc;">
-                <option value="">Semua Kategori</option>
-            </select>
+        <div style="margin-bottom:16px; display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+            <div>
+                <label for="kategoriDropdown" style="font-weight:bold;">Filter Kategori:</label>
+                <select id="kategoriDropdown" style="padding:8px 12px;border-radius:8px;border:1px solid #ccc;">
+                    <option value="">Semua Kategori</option>
+                </select>
+            </div>
+            <div>
+                <label for="searchInput" style="font-weight:bold;">Cari Nama:</label>
+                <input id="searchInput" type="text" placeholder="Ketik nama barang..." style="padding:8px 12px;border-radius:8px;border:1px solid #ccc; min-width:220px;">
+            </div>
         </div>
         <div class="panel">
             <h2>Daftar Stok Barang</h2>
@@ -58,8 +64,9 @@
     const db = firebase.firestore();
     const kategoriDropdown = document.getElementById('kategoriDropdown');
     const stokTableBody = document.getElementById('stokTableBody');
+    const searchInput = document.getElementById('searchInput');
     let allProducts = [];
-    let allDocs = [];
+    
 
     function renderKategoriDropdown(products) {
         const kategoriSet = new Set(products.map(p => p.type));
@@ -69,52 +76,57 @@
         });
     }
 
-    function renderStokTable(products, kategori) {
+    function renderStokTable(products, kategori, keyword) {
         stokTableBody.innerHTML = '';
-        products.filter(p => !kategori || p.type === kategori).forEach((item, idx) => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td><input type="text" value="${item.id}" style="width:80px" disabled></td>
-                <td><input type="text" value="${item.name}" id="name${idx}" style="width:120px"></td>
-                <td><input type="text" value="${item.type}" id="type${idx}" style="width:100px"></td>
-                <td><input type="number" value="${item.price}" id="price${idx}" style="width:80px"></td>
-                <td><input type="number" value="${item.stock}" id="stock${idx}" style="width:60px"></td>
-                <td>
-                    <button onclick="updateProduct(${idx})" class="btn btn-success" style="margin-bottom:4px;">Simpan</button>
-                    <button onclick="deleteProduct(${idx})" class="btn btn-danger">Hapus</button>
-                </td>
-            `;
-            stokTableBody.appendChild(row);
-        });
+        const q = (keyword || '').toLowerCase();
+        products
+            .filter(p => (!kategori || p.type === kategori))
+            .filter(p => (!q || (p.name || '').toLowerCase().includes(q)))
+            .forEach((item) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><input type="text" value="${item.id}" style="width:80px" disabled></td>
+                    <td><input type="text" value="${item.name}" id="name_${item.__docId}" style="width:180px"></td>
+                    <td><input type="text" value="${item.type}" id="type_${item.__docId}" style="width:120px"></td>
+                    <td><input type="number" value="${item.price}" id="price_${item.__docId}" style="width:100px"></td>
+                    <td><input type="number" value="${item.stock}" id="stock_${item.__docId}" style="width:80px"></td>
+                    <td>
+                        <button onclick="updateProduct('${item.__docId}')" class="btn btn-success" style="margin-bottom:4px;">Simpan</button>
+                        <button onclick="deleteProduct('${item.__docId}')" class="btn btn-danger">Hapus</button>
+                    </td>
+                `;
+                stokTableBody.appendChild(row);
+            });
     }
 
     function listenProducts() {
         db.collection('products').onSnapshot(snapshot => {
-            allProducts = snapshot.docs.map(doc => doc.data());
-            allDocs = snapshot.docs.map(doc => doc.id);
+            allProducts = snapshot.docs.map(doc => ({...doc.data(), __docId: doc.id}));
             renderKategoriDropdown(allProducts);
-            renderStokTable(allProducts, kategoriDropdown.value);
+            renderStokTable(allProducts, kategoriDropdown.value, searchInput.value);
         });
     }
 
     kategoriDropdown.addEventListener('change', function() {
-        renderStokTable(allProducts, kategoriDropdown.value);
+        renderStokTable(allProducts, kategoriDropdown.value, searchInput.value);
     });
 
-    window.updateProduct = function(idx) {
-        const docId = allDocs[idx];
-        const name = document.getElementById('name'+idx).value;
-        const type = document.getElementById('type'+idx).value;
-        const price = parseInt(document.getElementById('price'+idx).value);
-        const stock = parseInt(document.getElementById('stock'+idx).value);
+    searchInput.addEventListener('input', function() {
+        renderStokTable(allProducts, kategoriDropdown.value, searchInput.value);
+    });
+
+    window.updateProduct = function(docId) {
+        const name = document.getElementById('name_'+docId).value;
+        const type = document.getElementById('type_'+docId).value;
+        const price = parseInt(document.getElementById('price_'+docId).value);
+        const stock = parseInt(document.getElementById('stock_'+docId).value);
         db.collection('products').doc(docId).update({name, type, price, stock})
           .then(() => alert('Barang berhasil diupdate!'))
           .catch(err => alert('Gagal update: ' + err.message));
     }
 
-    window.deleteProduct = function(idx) {
+    window.deleteProduct = function(docId) {
         if (!confirm('Yakin ingin menghapus barang ini?')) return;
-        const docId = allDocs[idx];
         db.collection('products').doc(docId).delete()
           .then(() => alert('Barang berhasil dihapus!'))
           .catch(err => alert('Gagal hapus: ' + err.message));
