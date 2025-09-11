@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Belanja - Toko Arrahma</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Arial', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; }
+        .header { background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border-radius: 20px; padding: 20px; margin-bottom: 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.1); text-align:center; }
+        .header h1 { color: #2c3e50; font-size: 2rem; margin-bottom: 8px; }
+        .back-btn, .btn { background: linear-gradient(135deg, #3498db 0%, #764ba2 100%); color: #fff; padding: 12px 20px; border: none; border-radius: 25px; cursor: pointer; text-decoration: none; display: inline-block; transition: all .3s ease; font-weight: bold; }
+        .back-btn:hover, .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+        .panel { background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border-radius: 20px; padding: 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.1); }
+        .panel h2 { color: #2c3e50; margin-bottom: 16px; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display:block; margin-bottom:6px; color:#34495e; font-weight:bold; }
+        .form-group input { width:100%; padding:12px; border:2px solid #ecf0f1; border-radius:10px; font-size:1rem; transition:border-color .3s ease; }
+        .form-group input:focus { outline:none; border-color:#3498db; }
+        .muted { color:#7f8c8d; font-size: .9rem; }
+        .total-box { background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%); color:#fff; padding:18px; border-radius:15px; text-align:center; margin-top:10px; }
+        .total-amount { font-size:1.8rem; font-weight:700; }
+        .btn-save { background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%); margin-top: 14px; }
+    </style>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="kasir.html" class="back-btn">← Kembali ke Kasir</a>
+            <h1>Belanja - Toko Arrahma</h1>
+            <p class="muted">Catat pembelian barang ke pemasok</p>
+        </div>
+
+        <div class="panel">
+            <h2>Form Belanja</h2>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="storeName">Nama Toko / Pemasok</label>
+                    <input type="text" id="storeName" placeholder="Contoh: Grosir Jaya Abadi">
+                </div>
+                <div class="form-group">
+                    <label for="purchaseDate">Tanggal</label>
+                    <input type="date" id="purchaseDate">
+                </div>
+                <div class="form-group">
+                    <label for="itemName">Nama Barang</label>
+                    <input type="text" id="itemName" placeholder="Contoh: Gula Pasir 1kg">
+                </div>
+                <div class="form-group">
+                    <label for="quantity">Jumlah</label>
+                    <input type="number" id="quantity" min="1" placeholder="0" oninput="computeTotal()">
+                </div>
+                <div class="form-group">
+                    <label for="unitPrice">Harga Ecer (Rp)</label>
+                    <input type="number" id="unitPrice" min="0" placeholder="0" oninput="computeTotal()">
+                </div>
+                <div class="form-group">
+                    <label for="price">Harga (Rp)</label>
+                    <input type="number" id="price" min="0" placeholder="0" oninput="computeTotal()">
+                </div>
+            </div>
+
+            <div class="total-box">
+                <div>Harga</div>
+                <div class="total-amount" id="totalAmount">Rp 0</div>
+            </div>
+
+            <button class="btn btn-save" onclick="savePurchase()">💾 Simpan Belanja</button>
+        </div>
+
+        <div style="height:16px;"></div>
+
+        <div class="panel">
+            <h2>Data Belanja</h2>
+            <div class="form-grid" style="margin-bottom:12px;">
+                <div class="form-group">
+                    <label for="purchaseStart">Tanggal Mulai</label>
+                    <input type="date" id="purchaseStart">
+                </div>
+                <div class="form-group">
+                    <label for="purchaseEnd">Tanggal Selesai</label>
+                    <input type="date" id="purchaseEnd">
+                </div>
+                <div class="form-group">
+                    <label for="searchStore">Cari Nama Toko</label>
+                    <input type="text" id="searchStore" placeholder="Ketik nama toko/pemasok">
+                </div>
+                <div class="form-group">
+                    <label for="searchItem">Cari Nama Barang</label>
+                    <input type="text" id="searchItem" placeholder="Ketik nama barang">
+                </div>
+            </div>
+            <div style="margin-bottom:8px;">
+                <button class="btn" onclick="applyPurchaseFilter()">🔍 Terapkan Filter</button>
+                <button class="btn" onclick="loadPurchases(true)">🔄 Muat Ulang</button>
+                <button class="btn" onclick="exportPurchasesPdf()">📄 Unduh PDF</button>
+            </div>
+            <div style="overflow:auto;background:#fff;border-radius:10px;box-shadow:0 4px 15px rgba(0,0,0,0.1);">
+                <table style="width:100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); color:#fff;">
+                            <th style="text-align:left; padding:10px;">Tanggal</th>
+                            <th style="text-align:left; padding:10px;">Toko</th>
+                            <th style="text-align:left; padding:10px;">Barang</th>
+                            <th style="text-align:right; padding:10px;">Jumlah</th>
+                            <th style="text-align:right; padding:10px;">Harga Ecer</th>
+                            <th style="text-align:right; padding:10px;">Harga</th>
+                            <th style="text-align:left; padding:10px;">Kasir</th>
+                            <th style="text-align:left; padding:10px;">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="purchasesBody">
+                        <!-- rows -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Edit Belanja -->
+    <div id="editPurchaseModal" style="display:none;position:fixed;z-index:1000;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.4);align-items:center;justify-content:center;">
+      <div style="background:#fff;border-radius:18px;max-width:520px;width:92%;padding:24px;box-shadow:0 12px 36px rgba(0,0,0,0.25);position:relative;">
+        <button onclick="closeEditPurchase()" style="position:absolute;top:12px;right:12px;background:none;border:none;font-size:1.3rem;cursor:pointer;color:#e74c3c">&times;</button>
+        <h2 style="margin-bottom:12px;color:#2c3e50;">Edit Data Belanja</h2>
+        <input type="hidden" id="editId">
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="editStore">Nama Toko</label>
+            <input type="text" id="editStore">
+          </div>
+          <div class="form-group">
+            <label for="editDate">Tanggal</label>
+            <input type="date" id="editDate">
+          </div>
+          <div class="form-group">
+            <label for="editItem">Nama Barang</label>
+            <input type="text" id="editItem">
+          </div>
+          <div class="form-group">
+            <label for="editQty">Jumlah</label>
+            <input type="number" id="editQty" min="1">
+          </div>
+          <div class="form-group">
+            <label for="editUnit">Harga Ecer (Rp)</label>
+            <input type="number" id="editUnit" min="0">
+          </div>
+          <div class="form-group">
+            <label for="editPrice">Harga (Rp)</label>
+            <input type="number" id="editPrice" min="0">
+          </div>
+        </div>
+        <div style="margin-top:12px;text-align:right;">
+          <button class="btn" onclick="saveEditPurchase()">💾 Simpan Perubahan</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Konfigurasi Firebase
+      const firebaseConfig = {
+        apiKey: "AIzaSyADPQ_EU2m4s4HNDYFkid03osfUfiEUmUs",
+        authDomain: "web-toko-40273.firebaseapp.com",
+        projectId: "web-toko-40273",
+        storageBucket: "web-toko-40273.firebasestorage.app",
+        messagingSenderId: "207266690704",
+        appId: "1:207266690704:web:bcc5d16b6c9e3780088a15",
+        measurementId: "G-EGDRL1NKXZ"
+      };
+      if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+      }
+      const db = firebase.firestore();
+
+      function formatRupiah(n){ return (Number(n)||0).toLocaleString('id-ID'); }
+
+      function setToday(){
+        const d = new Date();
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth()+1).padStart(2,'0');
+        const dd = String(d.getDate()).padStart(2,'0');
+        document.getElementById('purchaseDate').value = `${yyyy}-${mm}-${dd}`;
+      }
+
+      function computeTotal(){
+        const price = parseInt(document.getElementById('price').value) || 0;
+        document.getElementById('totalAmount').textContent = `Rp ${formatRupiah(price)}`;
+      }
+
+      async function savePurchase(){
+        const storeName = document.getElementById('storeName').value.trim();
+        const purchaseDate = document.getElementById('purchaseDate').value;
+        const itemName = document.getElementById('itemName').value.trim();
+        const quantity = parseInt(document.getElementById('quantity').value) || 0;
+        const unitPrice = parseInt(document.getElementById('unitPrice').value) || 0;
+        const price = parseInt(document.getElementById('price').value) || 0;
+
+        if (!storeName || !purchaseDate || !itemName || quantity <= 0 || unitPrice < 0 || price < 0) {
+          alert('Lengkapi data dengan benar. Jumlah harus > 0.');
+          return;
+        }
+
+        const kasirEmail = sessionStorage.getItem('kasir_email') || 'unknown';
+        const data = {
+          toko: storeName,
+          tanggal: new Date(`${purchaseDate}T00:00:00.000Z`).toISOString(),
+          tanggal_str: purchaseDate,
+          barang: itemName,
+          jumlah: quantity,
+          harga_ecer: unitPrice,
+          harga: price,
+          kasir: kasirEmail,
+          dibuat_pada: new Date().toISOString()
+        };
+
+        try {
+          await db.collection('purchases').add(data);
+          alert('Data belanja tersimpan.');
+          // reset form
+          document.getElementById('itemName').value = '';
+          document.getElementById('quantity').value = '';
+          document.getElementById('unitPrice').value = '';
+          document.getElementById('price').value = '';
+          document.getElementById('totalAmount').textContent = 'Rp 0';
+          // refresh table
+          loadPurchases(true);
+        } catch (err) {
+          alert('Gagal menyimpan: ' + err.message);
+        }
+      }
+
+      // init
+      setToday();
+
+      function toDateOnlyString(d){
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth()+1).padStart(2,'0');
+        const dd = String(d.getDate()).padStart(2,'0');
+        return `${yyyy}-${mm}-${dd}`;
+      }
+
+      let purchasesCache = [];
+
+      function renderPurchases(rows){
+        const tbody = document.getElementById('purchasesBody');
+        tbody.innerHTML = '';
+        if (!rows || rows.length === 0) {
+          const tr = document.createElement('tr');
+          const td = document.createElement('td');
+          td.colSpan = 8;
+          td.textContent = 'Tidak ada data';
+          td.style.padding = '10px';
+          td.style.textAlign = 'center';
+          tr.appendChild(td);
+          tbody.appendChild(tr);
+          return;
+        }
+        rows.forEach(r => {
+          const tr = document.createElement('tr');
+          tr.style.borderBottom = '1px solid #ecf0f1';
+          const tglStr = r.tanggal_str || (r.tanggal ? new Date(r.tanggal).toLocaleDateString('id-ID') : '-');
+          tr.innerHTML = `
+            <td style="padding:10px;">${tglStr}</td>
+            <td style="padding:10px;">${r.toko || '-'}</td>
+            <td style="padding:10px;">${r.barang || '-'}</td>
+            <td style="padding:10px; text-align:right;">${Number(r.jumlah||0).toLocaleString('id-ID')}</td>
+            <td style="padding:10px; text-align:right;">Rp ${formatRupiah(r.harga_ecer||0)}</td>
+            <td style="padding:10px; text-align:right;">Rp ${formatRupiah(r.harga||0)}</td>
+            <td style="padding:10px;">${r.kasir || '-'}</td>
+            <td style="padding:10px;">
+              <button class="btn" onclick="openEditPurchase('${r._id || ''}')">✏️ Edit</button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      let purchasesUnsub = null;
+      async function loadPurchases(force){
+        try{
+          if (purchasesUnsub) { purchasesUnsub(); purchasesUnsub = null; }
+          const queryRef = db.collection('purchases').orderBy('dibuat_pada', 'desc').limit(100);
+          purchasesUnsub = queryRef.onSnapshot((snap) => {
+            let data = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+          // Terapkan filter tanggal jika ada
+          const s = document.getElementById('purchaseStart')?.value;
+          const e = document.getElementById('purchaseEnd')?.value;
+          if (s || e) {
+            const start = s ? new Date(`${s}T00:00:00.000Z`) : null;
+            const end = e ? new Date(`${e}T23:59:59.999Z`) : null;
+            data = data.filter(r => {
+              const t = r.tanggal ? new Date(r.tanggal) : (r.dibuat_pada ? new Date(r.dibuat_pada) : null);
+              if (!t) return false;
+              return (!start || t >= start) && (!end || t <= end);
+            });
+          }
+          // Terapkan filter teks: nama toko dan barang
+          const qStore = (document.getElementById('searchStore')?.value || '').toLowerCase().trim();
+          const qItem  = (document.getElementById('searchItem')?.value  || '').toLowerCase().trim();
+          if (qStore) {
+            data = data.filter(r => (r.toko || '').toLowerCase().includes(qStore));
+          }
+          if (qItem) {
+            data = data.filter(r => (r.barang || '').toLowerCase().includes(qItem));
+          }
+            purchasesCache = data.slice();
+            renderPurchases(data);
+          });
+        } catch(err){
+          alert('Gagal memuat data belanja: ' + err.message);
+        }
+      }
+
+      function openEditPurchase(id){
+        if (!id) return;
+        const rec = purchasesCache.find(r => r._id === id);
+        if (!rec) return;
+        document.getElementById('editId').value = id;
+        document.getElementById('editStore').value = rec.toko || '';
+        let dateStr = '';
+        if (rec.tanggal) {
+          const d = new Date(rec.tanggal);
+          const y = d.getFullYear();
+          const m = String(d.getMonth()+1).padStart(2,'0');
+          const da = String(d.getDate()).padStart(2,'0');
+          dateStr = `${y}-${m}-${da}`;
+        }
+        document.getElementById('editDate').value = dateStr;
+        document.getElementById('editItem').value = rec.barang || '';
+        document.getElementById('editQty').value = Number(rec.jumlah||0);
+        document.getElementById('editUnit').value = Number(rec.harga_ecer||0);
+        document.getElementById('editPrice').value = Number(rec.harga||0);
+        document.getElementById('editPurchaseModal').style.display = 'flex';
+      }
+
+      function closeEditPurchase(){
+        document.getElementById('editPurchaseModal').style.display = 'none';
+      }
+
+      async function saveEditPurchase(){
+        const id = document.getElementById('editId').value;
+        const toko = document.getElementById('editStore').value.trim();
+        const tgl = document.getElementById('editDate').value;
+        const barang = document.getElementById('editItem').value.trim();
+        const jumlah = parseInt(document.getElementById('editQty').value) || 0;
+        const harga_ecer = parseInt(document.getElementById('editUnit').value) || 0;
+        const harga = parseInt(document.getElementById('editPrice').value) || 0;
+        if (!id) { alert('ID tidak valid'); return; }
+        if (!toko || !barang || jumlah <= 0 || harga_ecer < 0 || harga < 0) {
+          alert('Lengkapi data edit dengan benar. Jumlah harus > 0.');
+          return;
+        }
+        const payload = {
+          toko,
+          barang,
+          jumlah,
+          harga_ecer,
+          harga
+        };
+        if (tgl) {
+          payload.tanggal = new Date(`${tgl}T00:00:00.000Z`).toISOString();
+        }
+        try {
+          await db.collection('purchases').doc(id).update(payload);
+          closeEditPurchase();
+          loadPurchases(true);
+        } catch (err) {
+          alert('Gagal menyimpan perubahan: ' + err.message);
+        }
+      }
+
+      function applyPurchaseFilter(){
+        loadPurchases(true);
+      }
+
+      // Muat data awal
+      loadPurchases();
+
+      function exportPurchasesPdf(){
+        try{
+          if (!window.jspdf || !window.jspdf.jsPDF) {
+            alert('Pustaka PDF belum termuat. Coba muat ulang halaman.');
+            return;
+          }
+          const data = (typeof purchasesCache !== 'undefined' && purchasesCache.length) ? purchasesCache : [];
+          const { jsPDF } = window.jspdf;
+          const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+          doc.setFontSize(16);
+          doc.text('Laporan Data Belanja - Toko Arrahma', 40, 40);
+          doc.setFontSize(10);
+          const s = document.getElementById('purchaseStart')?.value || '-';
+          const e = document.getElementById('purchaseEnd')?.value || '-';
+          const qStore = document.getElementById('searchStore')?.value || '';
+          const qItem  = document.getElementById('searchItem')?.value || '';
+          doc.text(`Periode: ${s} s.d. ${e}`, 40, 58);
+          doc.text(`Filter Toko: ${qStore || '-'}`, 40, 72);
+          doc.text(`Filter Barang: ${qItem || '-'}`, 40, 86);
+
+          const head = [[ 'Tanggal', 'Toko', 'Barang', 'Jumlah', 'Harga Ecer', 'Harga', 'Kasir' ]];
+          const body = data.map(r => {
+            const tanggal = r.tanggal_str || (r.tanggal ? new Date(r.tanggal).toLocaleDateString('id-ID') : '-');
+            const jumlah = Number(r.jumlah||0).toLocaleString('id-ID');
+            const hEcer = `Rp ${Number(r.harga_ecer||0).toLocaleString('id-ID')}`;
+            const harga  = `Rp ${Number(r.harga||0).toLocaleString('id-ID')}`;
+            return [ tanggal, r.toko || '-', r.barang || '-', jumlah, hEcer, harga, (r.kasir||'-') ];
+          });
+
+          if (typeof doc.autoTable !== 'function') {
+            alert('Plugin AutoTable belum aktif. Muat ulang halaman dan coba lagi.');
+            return;
+          }
+          doc.autoTable({
+            head,
+            body,
+            startY: 110,
+            styles: { fontSize: 8, overflow: 'linebreak', cellPadding: 3 },
+            headStyles: { fillColor: [52, 152, 219] },
+            margin: { left: 40, right: 40 },
+            tableWidth: 'auto',
+            columnStyles: {
+              0: { cellWidth: 120 },
+              1: { cellWidth: 120 },
+              2: { cellWidth: 160 },
+              3: { cellWidth: 60, halign: 'right' },
+              4: { cellWidth: 90, halign: 'right' },
+              5: { cellWidth: 90, halign: 'right' },
+              6: { cellWidth: 100 }
+            },
+            didDrawPage: function() {
+              const pageSize = doc.internal.pageSize;
+              const pageWidth = pageSize.getWidth();
+              const pageNumber = doc.internal.getNumberOfPages();
+              doc.setFontSize(9);
+              doc.text(`Halaman ${pageNumber}`, pageWidth - 40, pageSize.getHeight() - 20, { align: 'right' });
+            }
+          });
+
+          const date = new Date();
+          const y = date.getFullYear();
+          const m = String(date.getMonth()+1).padStart(2,'0');
+          const d = String(date.getDate()).padStart(2,'0');
+          doc.save(`data_belanja_${y}${m}${d}.pdf`);
+        } catch(err){
+          alert('Gagal membuat PDF: ' + err.message);
+        }
+      }
+    </script>
+</body>
+</html>
+
+

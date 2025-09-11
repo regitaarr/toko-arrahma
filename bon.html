@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bon - Toko Arrahma</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Arial', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; }
+        .header { background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border-radius: 20px; padding: 20px; margin-bottom: 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.1); text-align:center; }
+        .header h1 { color: #2c3e50; font-size: 2rem; margin-bottom: 8px; }
+        .back-btn, .btn { background: linear-gradient(135deg, #3498db 0%, #764ba2 100%); color: #fff; padding: 12px 20px; border: none; border-radius: 25px; cursor: pointer; text-decoration: none; display: inline-block; transition: all .3s ease; font-weight: bold; }
+        .back-btn:hover, .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+        .panel { background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border-radius: 20px; padding: 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.1); }
+        .panel h2 { color: #2c3e50; margin-bottom: 16px; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display:block; margin-bottom:6px; color:#34495e; font-weight:bold; }
+        .form-group input { width:100%; padding:12px; border:2px solid #ecf0f1; border-radius:10px; font-size:1rem; transition:border-color .3s ease; }
+        .form-group input:focus { outline:none; border-color:#3498db; }
+        .muted { color:#7f8c8d; font-size: .9rem; }
+        .total-box { background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%); color:#fff; padding:18px; border-radius:15px; text-align:center; margin-top:10px; }
+        .total-amount { font-size:1.8rem; font-weight:700; }
+        .btn-save { background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%); margin-top: 14px; }
+    </style>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="kasir.html" class="back-btn">← Kembali ke Kasir</a>
+            <h1>Bon - Toko Arrahma</h1>
+            <p class="muted">Input daftar pelanggan yang berhutang</p>
+        </div>
+
+        <div class="panel">
+            <h2>Form Bon</h2>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="bonDate">Tanggal</label>
+                    <input type="date" id="bonDate">
+                </div>
+                <div class="form-group">
+                    <label for="debtorName">Nama</label>
+                    <input type="text" id="debtorName" placeholder="Nama pelanggan">
+                </div>
+                <div class="form-group">
+                    <label for="itemSearch">Nama Barang</label>
+                    <input type="text" id="itemSearch" placeholder="Ketik nama barang">
+                    <div id="searchResults" style="margin-top:8px;border:1px solid #ecf0f1;border-radius:10px;max-height:180px;overflow:auto;background:#fff;display:none;"></div>
+                    <input type="hidden" id="selectedItemId">
+                </div>
+                <div class="form-group">
+                    <label for="quantity">Jumlah</label>
+                    <input type="number" id="quantity" min="1" placeholder="0" oninput="computeTotal()">
+                </div>
+                <div class="form-group">
+                    <label for="price">Harga (Rp)</label>
+                    <input type="number" id="price" min="0" placeholder="0" oninput="computeTotal()">
+                </div>
+                <div class="form-group">
+                    <label for="total">Total (Rp)</label>
+                    <input type="number" id="total" min="0" placeholder="0" readonly>
+                </div>
+            </div>
+
+            <div class="total-box">
+                <div>Total</div>
+                <div class="total-amount" id="totalAmount">Rp 0</div>
+            </div>
+
+            <button class="btn btn-save" onclick="saveBon()">💾 Simpan Bon</button>
+        </div>
+
+        <div style="height:16px;"></div>
+
+        <div class="panel">
+            <h2>Data Bon</h2>
+            <div class="form-grid" style="margin-bottom:12px;">
+                <div class="form-group">
+                    <label for="searchDebtor">Cari Nama</label>
+                    <input type="text" id="searchDebtor" placeholder="Ketik nama pelanggan">
+                </div>
+            </div>
+            <div style="margin-bottom:8px;">
+                <button class="btn" onclick="applyBonFilter()">🔍 Terapkan Filter</button>
+                <button class="btn" onclick="loadBons(true)">🔄 Muat Ulang</button>
+                <button class="btn" onclick="exportBonsPdf()">📄 Unduh PDF</button>
+            </div>
+            <div style="overflow:auto;background:#fff;border-radius:10px;box-shadow:0 4px 15px rgba(0,0,0,0.1);">
+                <table style="width:100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); color:#fff;">
+                            <th style="text-align:left; padding:10px;">Tanggal</th>
+                            <th style="text-align:left; padding:10px;">Nama</th>
+                            <th style="text-align:left; padding:10px;">Barang</th>
+                            <th style="text-align:right; padding:10px;">Jumlah</th>
+                            <th style="text-align:right; padding:10px;">Harga</th>
+                            <th style="text-align:right; padding:10px;">Total</th>
+                            <th style="text-align:left; padding:10px;">Status</th>
+                            <th style="text-align:left; padding:10px;">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bonsBody">
+                        <!-- rows -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Pilih Metode Pelunasan -->
+    <div id="payMethodModal" style="display:none;position:fixed;z-index:1000;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.4);align-items:center;justify-content:center;">
+      <div style="background:#fff;border-radius:18px;max-width:420px;width:92%;padding:24px;box-shadow:0 12px 36px rgba(0,0,0,0.25);position:relative;text-align:center;">
+        <button onclick="closePayMethod()" style="position:absolute;top:12px;right:12px;background:none;border:none;font-size:1.3rem;cursor:pointer;color:#e74c3c">&times;</button>
+        <h2 style="margin-bottom:12px;color:#2c3e50;">Pilih Metode Pelunasan</h2>
+        <div style="display:flex;gap:12px;justify-content:center;margin-top:8px;">
+          <button class="btn" onclick="choosePayMethod('cash')">💰 Tunai</button>
+          <button class="btn" onclick="choosePayMethod('qris')">📱 QRIS</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Edit Bon -->
+    <div id="editBonModal" style="display:none;position:fixed;z-index:1000;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.4);align-items:center;justify-content:center;">
+      <div style="background:#fff;border-radius:18px;max-width:520px;width:92%;padding:24px;box-shadow:0 12px 36px rgba(0,0,0,0.25);position:relative;">
+        <button onclick="closeEditBon()" style="position:absolute;top:12px;right:12px;background:none;border:none;font-size:1.3rem;cursor:pointer;color:#e74c3c">&times;</button>
+        <h2 style="margin-bottom:12px;color:#2c3e50;">Edit Data Bon</h2>
+        <input type="hidden" id="editBonId">
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="editBonDate">Tanggal</label>
+            <input type="date" id="editBonDate">
+          </div>
+          <div class="form-group">
+            <label for="editBonName">Nama</label>
+            <input type="text" id="editBonName">
+          </div>
+          <div class="form-group">
+            <label for="editBonItem">Barang</label>
+            <input type="text" id="editBonItem">
+          </div>
+          <div class="form-group">
+            <label for="editBonQty">Jumlah</label>
+            <input type="number" id="editBonQty" min="1" oninput="computeEditBonTotal()">
+          </div>
+          <div class="form-group">
+            <label for="editBonPrice">Harga (Rp)</label>
+            <input type="number" id="editBonPrice" min="0" oninput="computeEditBonTotal()">
+          </div>
+          <div class="form-group">
+            <label for="editBonTotal">Total (Rp)</label>
+            <input type="number" id="editBonTotal" min="0" readonly>
+          </div>
+        </div>
+        <div style="margin-top:12px;text-align:right;">
+          <button class="btn" onclick="saveEditBon()">💾 Simpan Perubahan</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Konfigurasi Firebase
+      const firebaseConfig = {
+        apiKey: "AIzaSyADPQ_EU2m4s4HNDYFkid03osfUfiEUmUs",
+        authDomain: "web-toko-40273.firebaseapp.com",
+        projectId: "web-toko-40273",
+        storageBucket: "web-toko-40273.firebasestorage.app",
+        messagingSenderId: "207266690704",
+        appId: "1:207266690704:web:bcc5d16b6c9e3780088a15",
+        measurementId: "G-EGDRL1NKXZ"
+      };
+      if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+      }
+      const db = firebase.firestore();
+      let firestoreProducts = [];
+
+      function formatRupiah(n){ return (Number(n)||0).toLocaleString('id-ID'); }
+
+      function setToday(){
+        const d = new Date();
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth()+1).padStart(2,'0');
+        const dd = String(d.getDate()).padStart(2,'0');
+        document.getElementById('bonDate').value = `${yyyy}-${mm}-${dd}`;
+      }
+
+      function computeTotal(){
+        const qty = parseInt(document.getElementById('quantity').value) || 0;
+        const price = parseInt(document.getElementById('price').value) || 0;
+        const total = qty * price;
+        document.getElementById('total').value = total;
+        document.getElementById('totalAmount').textContent = `Rp ${formatRupiah(total)}`;
+      }
+
+      // Pencarian barang dari Firestore
+      const itemSearchInput = document.getElementById('itemSearch');
+      const searchResultsEl = document.getElementById('searchResults');
+      const selectedItemIdInput = document.getElementById('selectedItemId');
+
+      function renderSearchResults(keyword) {
+        const q = (keyword || '').toLowerCase().trim();
+        if (!q) {
+          searchResultsEl.style.display = 'none';
+          searchResultsEl.innerHTML = '';
+          selectedItemIdInput.value = '';
+          return;
+        }
+        const results = firestoreProducts
+          .filter(p => (p.stock || 0) > 0 && (p.name || '').toLowerCase().includes(q))
+          .slice(0, 50);
+        if (results.length === 0) {
+          searchResultsEl.innerHTML = '<div style="padding:10px;color:#7f8c8d;">Tidak ada hasil</div>';
+          searchResultsEl.style.display = 'block';
+          selectedItemIdInput.value = '';
+          return;
+        }
+        searchResultsEl.innerHTML = results.map(p => {
+          const price = Number(p.price || 0).toLocaleString('id-ID');
+          const stock = Number(p.stock || 0);
+          return `<div data-id="${p.id}" style="padding:10px;border-bottom:1px solid #ecf0f1;cursor:pointer;">
+                    <div style=\"font-weight:600;color:#2c3e50;\">${p.name}</div>
+                    <div style=\"font-size:0.9rem;color:#7f8c8d;\">Rp ${price} • Stok: ${stock}</div>
+                  </div>`;
+        }).join('');
+        searchResultsEl.style.display = 'block';
+      }
+
+      db.collection('products').onSnapshot(snapshot => {
+        firestoreProducts = snapshot.docs.map(doc => doc.data());
+        renderSearchResults(itemSearchInput.value);
+      });
+
+      itemSearchInput.addEventListener('input', function(){
+        selectedItemIdInput.value = '';
+        renderSearchResults(this.value);
+      });
+      searchResultsEl.addEventListener('click', function(e){
+        const target = e.target.closest('[data-id]');
+        if (!target) return;
+        const id = target.getAttribute('data-id');
+        const product = firestoreProducts.find(p => p.id === id);
+        if (product) {
+          itemSearchInput.value = product.name || '';
+          selectedItemIdInput.value = product.id || '';
+          document.getElementById('price').value = Number(product.price || 0);
+          computeTotal();
+          searchResultsEl.style.display = 'none';
+          searchResultsEl.innerHTML = '';
+        }
+      });
+
+      async function saveBon(){
+        const bonDate = document.getElementById('bonDate').value;
+        const debtorName = document.getElementById('debtorName').value.trim();
+        const itemName = document.getElementById('itemSearch').value.trim();
+        const selectedItemId = document.getElementById('selectedItemId').value;
+        const quantity = parseInt(document.getElementById('quantity').value) || 0;
+        const price = parseInt(document.getElementById('price').value) || 0;
+        const total = parseInt(document.getElementById('total').value) || 0;
+
+        if (!bonDate || !debtorName || !itemName || quantity <= 0 || price < 0) {
+          alert('Lengkapi data bon dengan benar. Jumlah harus > 0.');
+          return;
+        }
+
+        const kasirEmail = sessionStorage.getItem('kasir_email') || 'unknown';
+        const data = {
+          tanggal: new Date(`${bonDate}T00:00:00.000Z`).toISOString(),
+          nama: debtorName,
+          barang: itemName,
+          barang_id: selectedItemId || null,
+          jumlah: quantity,
+          harga: price,
+          total: total,
+          kasir: kasirEmail,
+          dibuat_pada: new Date().toISOString(),
+          status: 'belum_lunas',
+          label: 'bon'
+        };
+
+        try {
+          await db.collection('bons').add(data);
+          alert('Data bon tersimpan.');
+          document.getElementById('debtorName').value = '';
+          document.getElementById('itemSearch').value = '';
+          document.getElementById('selectedItemId').value = '';
+          document.getElementById('quantity').value = '';
+          document.getElementById('price').value = '';
+          document.getElementById('total').value = '';
+          document.getElementById('totalAmount').textContent = 'Rp 0';
+          // refresh table
+          loadBons(true);
+        } catch (err) {
+          alert('Gagal menyimpan bon: ' + err.message);
+        }
+      }
+
+      setToday();
+
+      let bonsCache = [];
+      let pendingBonId = null;
+
+      function renderBons(rows){
+        const tbody = document.getElementById('bonsBody');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        if (!rows || rows.length === 0) {
+          const tr = document.createElement('tr');
+          const td = document.createElement('td');
+          td.colSpan = 8;
+          td.textContent = 'Tidak ada data';
+          td.style.padding = '10px';
+          td.style.textAlign = 'center';
+          tr.appendChild(td);
+          tbody.appendChild(tr);
+          return;
+        }
+        rows.forEach(r => {
+          const tr = document.createElement('tr');
+          tr.style.borderBottom = '1px solid #ecf0f1';
+          const t = r.tanggal ? new Date(r.tanggal) : (r.dibuat_pada ? new Date(r.dibuat_pada) : null);
+          const tanggal = t ? t.toLocaleDateString('id-ID') : '-';
+          const statusText = (r.status || 'belum_lunas').replace('_',' ');
+          tr.innerHTML = `
+            <td style="padding:10px;">${tanggal}</td>
+            <td style="padding:10px;">${r.nama || '-'}</td>
+            <td style="padding:10px;">${r.barang || '-'}</td>
+            <td style="padding:10px; text-align:right;">${Number(r.jumlah||0).toLocaleString('id-ID')}</td>
+            <td style="padding:10px; text-align:right;">Rp ${Number(r.harga||0).toLocaleString('id-ID')}</td>
+            <td style="padding:10px; text-align:right;">Rp ${Number(r.total||0).toLocaleString('id-ID')}</td>
+            <td style="padding:10px;">${statusText}</td>
+            <td style="padding:10px;">
+              <button class=\"btn\" onclick=\"openEditBon('${r._id || ''}')\">✏️ Edit</button>
+              <button class=\"btn\" style=\"background:linear-gradient(135deg,#e74c3c 0%,#c0392b 100%)\" onclick=\"deleteBon('${r._id || ''}')\">🗑️ Hapus</button>
+              ${statusText === 'belum lunas' ? `<button class=\"btn\" onclick=\"openPayMethod('${r._id || ''}')\">✅ Tandai Lunas</button>` : ''}
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      async function loadBons(force){
+        try{
+          const snap = await db.collection('bons').orderBy('dibuat_pada', 'desc').limit(100).get();
+          let data = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+          const q = (document.getElementById('searchDebtor')?.value || '').toLowerCase().trim();
+          if (q) {
+            data = data.filter(r => (r.nama || '').toLowerCase().includes(q));
+          }
+          bonsCache = data.slice();
+          renderBons(data);
+        } catch(err){
+          alert('Gagal memuat data bon: ' + err.message);
+        }
+      }
+
+      function openPayMethod(id){
+        pendingBonId = id;
+        document.getElementById('payMethodModal').style.display = 'flex';
+      }
+
+      function closePayMethod(){
+        pendingBonId = null;
+        document.getElementById('payMethodModal').style.display = 'none';
+      }
+
+      function choosePayMethod(method){
+        if (!pendingBonId) { closePayMethod(); return; }
+        markBonPaid(pendingBonId, method);
+      }
+
+      async function markBonPaid(id, method){
+        try{
+          const rec = bonsCache.find(b => b._id === id);
+          if (!rec) { alert('Data bon tidak ditemukan'); return; }
+          if (!method) { alert('Pilih metode terlebih dahulu'); return; }
+          if (!confirm(`Tandai bon ini sebagai LUNAS dengan metode ${method.toUpperCase()} dan simpan ke transaksi?`)) { return; }
+          const transaksi = {
+            waktu: new Date().toISOString(),
+            kasir: rec.kasir || (sessionStorage.getItem('kasir_email') || 'unknown'),
+            pelanggan: rec.nama || '',
+            items: [ { id: rec.barang_id || null, name: rec.barang || '-', qty: Number(rec.jumlah||0), price: Number(rec.harga||0) } ],
+            total: Number(rec.total || (Number(rec.harga||0) * Number(rec.jumlah||0)) || 0),
+            diskon: 0,
+            total_setelah_diskon: Number(rec.total || (Number(rec.harga||0) * Number(rec.jumlah||0)) || 0),
+            metode: method,
+            label: 'bon'
+          };
+          const trxRef = await db.collection('transactions').add(transaksi);
+          await db.collection('bons').doc(id).update({ 
+            status: 'lunas', 
+            lunas_pada: new Date().toISOString(), 
+            metode_pelunasan: method,
+            transaksi_id: trxRef.id
+          });
+          alert('Bon ditandai LUNAS dan transaksi tersimpan.');
+          closePayMethod();
+          loadBons(true);
+        } catch(err){
+          alert('Gagal menandai lunas: ' + err.message);
+        }
+      }
+
+      function applyBonFilter(){
+        loadBons(true);
+      }
+
+      // initial load
+      loadBons();
+
+      function openEditBon(id){
+        const rec = bonsCache.find(b => b._id === id);
+        if (!rec) return;
+        document.getElementById('editBonId').value = id;
+        let dStr = '';
+        if (rec.tanggal) {
+          const d = new Date(rec.tanggal);
+          const y = d.getFullYear();
+          const m = String(d.getMonth()+1).padStart(2,'0');
+          const da = String(d.getDate()).padStart(2,'0');
+          dStr = `${y}-${m}-${da}`;
+        }
+        document.getElementById('editBonDate').value = dStr;
+        document.getElementById('editBonName').value = rec.nama || '';
+        document.getElementById('editBonItem').value = rec.barang || '';
+        document.getElementById('editBonQty').value = Number(rec.jumlah||0);
+        document.getElementById('editBonPrice').value = Number(rec.harga||0);
+        document.getElementById('editBonTotal').value = Number(rec.total||0);
+        document.getElementById('editBonModal').style.display = 'flex';
+      }
+
+      function closeEditBon(){
+        document.getElementById('editBonModal').style.display = 'none';
+      }
+
+      function computeEditBonTotal(){
+        const qty = parseInt(document.getElementById('editBonQty').value) || 0;
+        const price = parseInt(document.getElementById('editBonPrice').value) || 0;
+        document.getElementById('editBonTotal').value = qty * price;
+      }
+
+      async function saveEditBon(){
+        const id = document.getElementById('editBonId').value;
+        const tgl = document.getElementById('editBonDate').value;
+        const nama = document.getElementById('editBonName').value.trim();
+        const barang = document.getElementById('editBonItem').value.trim();
+        const jumlah = parseInt(document.getElementById('editBonQty').value) || 0;
+        const harga = parseInt(document.getElementById('editBonPrice').value) || 0;
+        const total = parseInt(document.getElementById('editBonTotal').value) || 0;
+        if (!id || !nama || !barang || jumlah <= 0 || harga < 0) {
+          alert('Lengkapi data dengan benar. Jumlah harus > 0.');
+          return;
+        }
+        const payload = { nama, barang, jumlah, harga, total };
+        if (tgl) payload.tanggal = new Date(`${tgl}T00:00:00.000Z`).toISOString();
+        try{
+          await db.collection('bons').doc(id).update(payload);
+          closeEditBon();
+          loadBons(true);
+        }catch(err){
+          alert('Gagal menyimpan perubahan: ' + err.message);
+        }
+      }
+
+      async function deleteBon(id){
+        const rec = bonsCache.find(b => b._id === id);
+        if (!rec) { alert('Data bon tidak ditemukan'); return; }
+        if (!confirm('Hapus data bon ini? Tindakan ini tidak dapat dibatalkan.')) return;
+        try{
+          await db.collection('bons').doc(id).delete();
+          alert('Data bon dihapus.');
+          loadBons(true);
+        }catch(err){
+          alert('Gagal menghapus: ' + err.message);
+        }
+      }
+
+      function exportBonsPdf(){
+        try {
+          if (!window.jspdf || !window.jspdf.jsPDF) {
+            alert('Pustaka PDF belum termuat. Coba muat ulang halaman.');
+            return;
+          }
+          const data = (typeof bonsCache !== 'undefined' && bonsCache.length) ? bonsCache : [];
+          const { jsPDF } = window.jspdf;
+          const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+          doc.setFontSize(16);
+          doc.text('Data Bon - Toko Arrahma', 40, 40);
+          doc.setFontSize(10);
+          const q = document.getElementById('searchDebtor')?.value || '';
+          doc.text(`Filter Nama: ${q || '-'}`, 40, 58);
+
+          const head = [[ 'Tanggal', 'Nama', 'Barang', 'Jumlah', 'Harga', 'Total', 'Status' ]];
+          const body = data.map(r => {
+            const t = r.tanggal ? new Date(r.tanggal) : (r.dibuat_pada ? new Date(r.dibuat_pada) : null);
+            const tanggal = t ? t.toLocaleDateString('id-ID') : '-';
+            return [
+              tanggal,
+              r.nama || '-',
+              r.barang || '-',
+              String(Number(r.jumlah||0).toLocaleString('id-ID')),
+              `Rp ${Number(r.harga||0).toLocaleString('id-ID')}`,
+              `Rp ${Number(r.total||0).toLocaleString('id-ID')}`,
+              (r.status || 'belum_lunas').replace('_',' ')
+            ];
+          });
+
+          if (typeof doc.autoTable !== 'function') {
+            alert('Plugin AutoTable belum aktif. Muat ulang halaman dan coba lagi.');
+            return;
+          }
+          doc.autoTable({
+            head,
+            body,
+            startY: 90,
+            styles: { fontSize: 8, overflow: 'linebreak', cellPadding: 3 },
+            headStyles: { fillColor: [52, 152, 219] },
+            margin: { left: 40, right: 40 },
+            tableWidth: 'auto',
+            columnStyles: {
+              0: { cellWidth: 110 },
+              1: { cellWidth: 110 },
+              2: { cellWidth: 170 },
+              3: { cellWidth: 60, halign: 'right' },
+              4: { cellWidth: 80, halign: 'right' },
+              5: { cellWidth: 90, halign: 'right' },
+              6: { cellWidth: 90 }
+            },
+            didDrawPage: function() {
+              const pageSize = doc.internal.pageSize;
+              const pageWidth = pageSize.getWidth();
+              const pageNumber = doc.internal.getNumberOfPages();
+              doc.setFontSize(9);
+              doc.text(`Halaman ${pageNumber}`, pageWidth - 40, pageSize.getHeight() - 20, { align: 'right' });
+            }
+          });
+
+          const date = new Date();
+          const y = date.getFullYear();
+          const m = String(date.getMonth()+1).padStart(2,'0');
+          const d = String(date.getDate()).padStart(2,'0');
+          doc.save(`data_bon_${y}${m}${d}.pdf`);
+        } catch(err){
+          alert('Gagal membuat PDF: ' + err.message);
+        }
+      }
+    </script>
+</body>
+</html>
+
+

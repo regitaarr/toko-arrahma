@@ -311,6 +311,8 @@
             <a href="tambah_barang.html" class="btn">Tambah Barang</a>
             <a href="stok_barang.html" class="btn">Cek/Edit Stok</a>
             <a href="kasir.html" class="btn">Transaksi</a>
+            <a href="belanja.html" class="btn">Belanja</a>
+            <a href="bon.html" class="btn">Bon</a>
         </nav>
         <!-- Laporan Penjualan -->
         <div class="panel" style="margin-bottom:20px;">
@@ -337,16 +339,10 @@
                         <input type="text" id="customerName" placeholder="Masukkan nama pelanggan">
                     </div>
                     <div class="form-group">
-                        <label for="selectCategory">Pilih Kategori:</label>
-                        <select id="selectCategory" style="margin-bottom:10px;">
-                            <option value="">Pilih kategori</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="selectItem">Pilih Barang:</label>
-                        <select id="selectItem">
-                            <option value="">Pilih barang</option>
-                        </select>
+                        <label for="itemSearch">Cari Barang (ketik nama):</label>
+                        <input type="text" id="itemSearch" placeholder="Masukkan nama barang">
+                        <div id="searchResults" style="margin-top:8px;border:1px solid #ecf0f1;border-radius:10px;max-height:180px;overflow:auto;background:#fff;display:none;"></div>
+                        <input type="hidden" id="selectedItemId">
                     </div>
                     <div class="form-group">
                         <label for="quantity">Jumlah:</label>
@@ -448,44 +444,70 @@
     let selectedPayment = '';
     let currentTotal = 0;
 
-    // Ambil data produk dari Firestore dan tampilkan di tabel stok barang
-    const selectCategory = document.getElementById('selectCategory');
-    const selectItem = document.getElementById('selectItem');
+    // Ambil data produk dari Firestore
+    const itemSearchInput = document.getElementById('itemSearch');
+    const searchResultsEl = document.getElementById('searchResults');
+    const selectedItemIdInput = document.getElementById('selectedItemId');
     let firestoreProducts = [];
 
-    function updateCategoryDropdown() {
-        const kategoriSet = new Set(firestoreProducts.map(p => p.type));
-        selectCategory.innerHTML = '<option value="">Pilih kategori</option>';
-        kategoriSet.forEach(kat => {
-            if (kat) selectCategory.innerHTML += `<option value="${kat}">${kat}</option>`;
-        });
-    }
-
-    function updateItemSelectFromFirestore() {
-        const kategori = selectCategory.value;
-        selectItem.innerHTML = '<option value="">Pilih barang</option>';
-        selectItem.disabled = !kategori;
-        if (!kategori) return;
-        firestoreProducts.filter(item => item.type === kategori && item.stock > 0).forEach(item => {
-            selectItem.innerHTML += `<option value="${item.id}">${item.name} - Rp ${item.price.toLocaleString()} (Stok: ${item.stock})</option>`;
-        });
+    function renderSearchResults(keyword) {
+        const q = (keyword || '').toLowerCase().trim();
+        if (!q) {
+            searchResultsEl.style.display = 'none';
+            searchResultsEl.innerHTML = '';
+            selectedItemIdInput.value = '';
+            return;
+        }
+        const results = firestoreProducts
+            .filter(p => (p.stock || 0) > 0 && (p.name || '').toLowerCase().includes(q))
+            .slice(0, 50);
+        if (results.length === 0) {
+            searchResultsEl.innerHTML = '<div style="padding:10px;color:#7f8c8d;">Tidak ada hasil</div>';
+            searchResultsEl.style.display = 'block';
+            selectedItemIdInput.value = '';
+            return;
+        }
+        searchResultsEl.innerHTML = results.map(p => {
+            const price = Number(p.price || 0).toLocaleString('id-ID');
+            const stock = Number(p.stock || 0);
+            return `<div data-id="${p.id}" style="padding:10px;border-bottom:1px solid #ecf0f1;cursor:pointer;">
+                        <div style="font-weight:600;color:#2c3e50;">${p.name}</div>
+                        <div style="font-size:0.9rem;color:#7f8c8d;">Rp ${price} • Stok: ${stock}</div>
+                    </div>`;
+        }).join('');
+        searchResultsEl.style.display = 'block';
     }
 
     db.collection('products').onSnapshot(snapshot => {
         firestoreProducts = snapshot.docs.map(doc => doc.data());
-        updateCategoryDropdown();
-        updateItemSelectFromFirestore();
+        // Refresh hasil pencarian saat data berubah
+        renderSearchResults(itemSearchInput.value);
     });
 
-    selectCategory.addEventListener('change', updateItemSelectFromFirestore);
+    itemSearchInput.addEventListener('input', function() {
+        selectedItemIdInput.value = '';
+        renderSearchResults(this.value);
+    });
+    searchResultsEl.addEventListener('click', function(e) {
+        const target = e.target.closest('[data-id]');
+        if (!target) return;
+        const id = target.getAttribute('data-id');
+        const product = firestoreProducts.find(p => p.id === id);
+        if (product) {
+            itemSearchInput.value = product.name;
+            selectedItemIdInput.value = product.id;
+            searchResultsEl.style.display = 'none';
+            searchResultsEl.innerHTML = '';
+        }
+    });
 
     // Add item to cart
     function addToCart() {
-        const itemId = document.getElementById('selectItem').value;
+        const itemId = document.getElementById('selectedItemId').value;
         const quantity = parseInt(document.getElementById('quantity').value);
 
         if (!itemId) {
-            alert('Pilih barang terlebih dahulu!');
+            alert('Cari dan pilih barang terlebih dahulu dari hasil pencarian!');
             return;
         }
 
@@ -526,7 +548,8 @@
         updateTotal();
         
         // Clear form
-        document.getElementById('selectItem').value = '';
+        document.getElementById('itemSearch').value = '';
+        document.getElementById('selectedItemId').value = '';
         document.getElementById('quantity').value = '';
     }
 
