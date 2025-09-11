@@ -364,6 +364,7 @@
         };
         if (tgl) {
           payload.tanggal = new Date(`${tgl}T00:00:00.000Z`).toISOString();
+          payload.tanggal_str = tgl;
         }
         try {
           await db.collection('purchases').doc(id).update(payload);
