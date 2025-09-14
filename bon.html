@@ -91,6 +91,10 @@
                 <button class="btn" onclick="loadBons(true)">🔄 Muat Ulang</button>
                 <button class="btn" onclick="exportBonsPdf()">📄 Unduh PDF</button>
             </div>
+            <div style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); color: white; padding: 15px; border-radius: 10px; margin-bottom: 15px; text-align: center;">
+                <div style="font-size: 1.2rem; font-weight: bold;">Total Kekurangan Pembayaran</div>
+                <div style="font-size: 1.8rem; font-weight: bold;" id="totalShortage">Rp 0</div>
+            </div>
             <div style="overflow:auto;background:#fff;border-radius:10px;box-shadow:0 4px 15px rgba(0,0,0,0.1);">
                 <table style="width:100%; border-collapse: collapse;">
                     <thead>
@@ -101,6 +105,7 @@
                             <th style="text-align:right; padding:10px;">Jumlah</th>
                             <th style="text-align:right; padding:10px;">Harga</th>
                             <th style="text-align:right; padding:10px;">Total</th>
+                            <th style="text-align:left; padding:10px;">Keterangan</th>
                             <th style="text-align:left; padding:10px;">Status</th>
                             <th style="text-align:left; padding:10px;">Aksi</th>
                         </tr>
@@ -313,12 +318,13 @@
         if (!rows || rows.length === 0) {
           const tr = document.createElement('tr');
           const td = document.createElement('td');
-          td.colSpan = 8;
+          td.colSpan = 9;
           td.textContent = 'Tidak ada data';
           td.style.padding = '10px';
           td.style.textAlign = 'center';
           tr.appendChild(td);
           tbody.appendChild(tr);
+          updateTotalShortage([]);
           return;
         }
         rows.forEach(r => {
@@ -334,6 +340,7 @@
             <td style="padding:10px; text-align:right;">${Number(r.jumlah||0).toLocaleString('id-ID')}</td>
             <td style="padding:10px; text-align:right;">Rp ${Number(r.harga||0).toLocaleString('id-ID')}</td>
             <td style="padding:10px; text-align:right;">Rp ${Number(r.total||0).toLocaleString('id-ID')}</td>
+            <td style="padding:10px; font-size:0.9rem; color:#7f8c8d;">${r.keterangan || '-'}</td>
             <td style="padding:10px;">${statusText}</td>
             <td style="padding:10px;">
               <button class=\"btn\" onclick=\"openEditBon('${r._id || ''}')\">✏️ Edit</button>
@@ -343,6 +350,14 @@
           `;
           tbody.appendChild(tr);
         });
+        updateTotalShortage(rows);
+      }
+
+      function updateTotalShortage(rows) {
+        const totalShortage = rows.reduce((sum, r) => {
+          return sum + (Number(r.kekurangan) || 0);
+        }, 0);
+        document.getElementById('totalShortage').textContent = `Rp ${formatRupiah(totalShortage)}`;
       }
 
       async function loadBons(force){
@@ -490,13 +505,13 @@
           const data = (typeof bonsCache !== 'undefined' && bonsCache.length) ? bonsCache : [];
           const { jsPDF } = window.jspdf;
           const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
-          doc.setFontSize(16);
+          doc.setFontSize(14);
           doc.text('Data Bon - Toko Arrahma', 40, 40);
-          doc.setFontSize(10);
+          doc.setFontSize(14);
           const q = document.getElementById('searchDebtor')?.value || '';
           doc.text(`Filter Nama: ${q || '-'}`, 40, 58);
 
-          const head = [[ 'Tanggal', 'Nama', 'Barang', 'Jumlah', 'Harga', 'Total', 'Status' ]];
+          const head = [[ 'Tanggal', 'Nama', 'Barang', 'Jumlah', 'Harga', 'Total', 'Keterangan', 'Status' ]];
           const body = data.map(r => {
             const t = r.tanggal ? new Date(r.tanggal) : (r.dibuat_pada ? new Date(r.dibuat_pada) : null);
             const tanggal = t ? t.toLocaleDateString('id-ID') : '-';
@@ -507,6 +522,7 @@
               String(Number(r.jumlah||0).toLocaleString('id-ID')),
               `Rp ${Number(r.harga||0).toLocaleString('id-ID')}`,
               `Rp ${Number(r.total||0).toLocaleString('id-ID')}`,
+              r.keterangan || '-',
               (r.status || 'belum_lunas').replace('_',' ')
             ];
           });
@@ -519,24 +535,25 @@
             head,
             body,
             startY: 90,
-            styles: { fontSize: 8, overflow: 'linebreak', cellPadding: 3 },
+            styles: { fontSize: 14, overflow: 'linebreak', cellPadding: 3 },
             headStyles: { fillColor: [52, 152, 219] },
             margin: { left: 40, right: 40 },
             tableWidth: 'auto',
             columnStyles: {
-              0: { cellWidth: 110 },
-              1: { cellWidth: 110 },
-              2: { cellWidth: 170 },
-              3: { cellWidth: 60, halign: 'right' },
-              4: { cellWidth: 80, halign: 'right' },
-              5: { cellWidth: 90, halign: 'right' },
-              6: { cellWidth: 90 }
+              0: { cellWidth: 100 },
+              1: { cellWidth: 100 },
+              2: { cellWidth: 150 },
+              3: { cellWidth: 50, halign: 'right' },
+              4: { cellWidth: 70, halign: 'right' },
+              5: { cellWidth: 80, halign: 'right' },
+              6: { cellWidth: 120 },
+              7: { cellWidth: 80 }
             },
             didDrawPage: function() {
               const pageSize = doc.internal.pageSize;
               const pageWidth = pageSize.getWidth();
               const pageNumber = doc.internal.getNumberOfPages();
-              doc.setFontSize(9);
+              doc.setFontSize(14);
               doc.text(`Halaman ${pageNumber}`, pageWidth - 40, pageSize.getHeight() - 20, { align: 'right' });
             }
           });

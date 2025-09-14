@@ -391,9 +391,9 @@
           const data = (typeof purchasesCache !== 'undefined' && purchasesCache.length) ? purchasesCache : [];
           const { jsPDF } = window.jspdf;
           const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
-          doc.setFontSize(16);
+          doc.setFontSize(14);
           doc.text('Laporan Data Belanja - Toko Arrahma', 40, 40);
-          doc.setFontSize(10);
+          doc.setFontSize(14);
           const s = document.getElementById('purchaseStart')?.value || '-';
           const e = document.getElementById('purchaseEnd')?.value || '-';
           const qStore = document.getElementById('searchStore')?.value || '';
@@ -401,14 +401,35 @@
           doc.text(`Periode: ${s} s.d. ${e}`, 40, 58);
           doc.text(`Filter Toko: ${qStore || '-'}`, 40, 72);
           doc.text(`Filter Barang: ${qItem || '-'}`, 40, 86);
+          
+          // Hitung total jenis produk per toko (berdasarkan nama barang unik)
+          const tokoTotals = {};
+          data.forEach(r => {
+            const toko = r.toko || 'Tidak Diketahui';
+            const barang = r.barang || '';
+            if (barang) {
+              if (!tokoTotals[toko]) {
+                tokoTotals[toko] = new Set();
+              }
+              tokoTotals[toko].add(barang);
+            }
+          });
+          
+          // Tampilkan total per toko
+          let yPos = 100;
+          Object.keys(tokoTotals).forEach(toko => {
+            const totalJenis = tokoTotals[toko].size;
+            doc.text(`${toko}: ${totalJenis} jenis produk`, 40, yPos);
+            yPos += 14;
+          });
 
-          const head = [[ 'Tanggal', 'Toko', 'Barang', 'Jumlah', 'Harga Ecer', 'Harga', 'Kasir' ]];
+          const head = [[ 'Tanggal', 'Toko', 'Barang', 'Jumlah', 'Harga', 'Harga Ecer' ]];
           const body = data.map(r => {
             const tanggal = r.tanggal_str || (r.tanggal ? new Date(r.tanggal).toLocaleDateString('id-ID') : '-');
             const jumlah = Number(r.jumlah||0).toLocaleString('id-ID');
             const hEcer = `Rp ${Number(r.harga_ecer||0).toLocaleString('id-ID')}`;
             const harga  = `Rp ${Number(r.harga||0).toLocaleString('id-ID')}`;
-            return [ tanggal, r.toko || '-', r.barang || '-', jumlah, hEcer, harga, (r.kasir||'-') ];
+            return [ tanggal, r.toko || '-', r.barang || '-', jumlah, harga, hEcer ];
           });
 
           if (typeof doc.autoTable !== 'function') {
@@ -418,25 +439,24 @@
           doc.autoTable({
             head,
             body,
-            startY: 110,
-            styles: { fontSize: 8, overflow: 'linebreak', cellPadding: 3 },
+            startY: yPos + 10,
+            styles: { fontSize: 14, overflow: 'linebreak', cellPadding: 3 },
             headStyles: { fillColor: [52, 152, 219] },
             margin: { left: 40, right: 40 },
             tableWidth: 'auto',
             columnStyles: {
-              0: { cellWidth: 120 },
-              1: { cellWidth: 120 },
-              2: { cellWidth: 160 },
-              3: { cellWidth: 60, halign: 'right' },
-              4: { cellWidth: 90, halign: 'right' },
-              5: { cellWidth: 90, halign: 'right' },
-              6: { cellWidth: 100 }
+              0: { cellWidth: 140 },
+              1: { cellWidth: 140 },
+              2: { cellWidth: 180 },
+              3: { cellWidth: 70, halign: 'right' },
+              4: { cellWidth: 100, halign: 'right' },
+              5: { cellWidth: 100, halign: 'right' }
             },
             didDrawPage: function() {
               const pageSize = doc.internal.pageSize;
               const pageWidth = pageSize.getWidth();
               const pageNumber = doc.internal.getNumberOfPages();
-              doc.setFontSize(9);
+              doc.setFontSize(14);
               doc.text(`Halaman ${pageNumber}`, pageWidth - 40, pageSize.getHeight() - 20, { align: 'right' });
             }
           });

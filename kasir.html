@@ -236,6 +236,22 @@
             margin-top: 10px;
         }
 
+        .shortage-warning {
+            background: #ffe6e6;
+            border: 2px solid #ff6b6b;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+            color: #d63031;
+            font-weight: bold;
+            text-align: center;
+            display: none;
+        }
+
+        .shortage-warning.active {
+            display: block;
+        }
+
         .modal {
             display: none;
             position: fixed;
@@ -398,6 +414,9 @@
                     <input type="number" id="cashAmount" placeholder="Masukkan jumlah uang" oninput="calculateChange()">
                 </div>
                 <div class="change-amount" id="changeAmount">Kembalian: Rp 0</div>
+                <div class="shortage-warning" id="shortageWarning">
+                    ⚠️ Uang tunai kurang! Kekurangan akan disimpan ke bon.
+                </div>
             </div>
 
             <button class="btn btn-warning" onclick="processPayment()" style="font-size: 1.2rem; padding: 15px 30px; margin-top: 20px;">
@@ -624,12 +643,83 @@
         const change = cashAmount - finalTotal;
         
         const changeElement = document.getElementById('changeAmount');
+        const warningElement = document.getElementById('shortageWarning');
+        
         if (change >= 0) {
             changeElement.textContent = `Kembalian: Rp ${change.toLocaleString()}`;
             changeElement.style.color = '#27ae60';
+            warningElement.classList.remove('active');
         } else {
             changeElement.textContent = `Kurang: Rp ${Math.abs(change).toLocaleString()}`;
             changeElement.style.color = '#e74c3c';
+            warningElement.classList.add('active');
+        }
+    }
+
+    // Save to bon when cash payment is insufficient
+    async function saveToBon(customerName, cartItems, total, discount, finalTotal, shortage) {
+        try {
+            const kasirEmail = sessionStorage.getItem('kasir_email') || 'unknown';
+            const now = new Date();
+            
+            // Simpan setiap item di keranjang sebagai bon terpisah
+            for (const item of cartItems) {
+                const bonData = {
+                    tanggal: now.toISOString(),
+                    nama: customerName,
+                    barang: item.name,
+                    barang_id: item.id,
+                    jumlah: item.quantity,
+                    harga: item.price,
+                    total: item.price * item.quantity,
+                    kasir: kasirEmail,
+                    dibuat_pada: now.toISOString(),
+                    status: 'belum_lunas',
+                    label: 'bon',
+                    keterangan: `Pembayaran tunai kurang Rp ${shortage.toLocaleString()}`,
+                    total_transaksi: finalTotal,
+                    uang_diterima: finalTotal - shortage,
+                    kekurangan: shortage
+                };
+                
+                await db.collection('bons').add(bonData);
+            }
+            
+            // Update stok barang
+            const updatePromises = cartItems.map(cartItem => {
+                const productRef = db.collection('products').where('id', '==', cartItem.id);
+                return productRef.get().then(snapshot => {
+                    if (!snapshot.empty) {
+                        const doc = snapshot.docs[0];
+                        const newStock = (doc.data().stock || 0) - cartItem.quantity;
+                        return db.collection('products').doc(doc.id).update({ stock: newStock });
+                    }
+                });
+            });
+            
+            await Promise.all(updatePromises);
+            
+            alert(`Transaksi berhasil disimpan ke bon!\nKekurangan: Rp ${shortage.toLocaleString()}\nSilakan cek halaman Bon untuk detail.`);
+            
+            // Clear cart and form
+            cart = [];
+            updateCartTable();
+            updateTotal();
+            
+            // Reset payment
+            selectedPayment = '';
+            document.querySelectorAll('.payment-method').forEach(el => {
+                el.classList.remove('active');
+            });
+            document.getElementById('cashCalculation').classList.remove('active');
+            document.getElementById('cashAmount').value = '';
+            document.getElementById('changeAmount').textContent = 'Kembalian: Rp 0';
+            document.getElementById('discountAmount').value = 0;
+            document.getElementById('finalTotalAmount').textContent = 'Total Setelah Diskon: Rp 0';
+            document.getElementById('customerName').value = '';
+            
+        } catch (error) {
+            alert('Gagal menyimpan ke bon: ' + error.message);
         }
     }
 
@@ -648,11 +738,23 @@
         let total = cart.reduce((total, item) => total + (item.price * item.quantity), 0);
         let finalTotal = total - discount;
         if (finalTotal < 0) finalTotal = 0;
+        
         if (selectedPayment === 'cash') {
             const cashAmount = parseInt(document.getElementById('cashAmount').value) || 0;
             if (cashAmount < finalTotal) {
-                alert('Jumlah uang tidak mencukupi!');
-                return;
+                // Uang kurang - tanyakan apakah ingin menyimpan ke bon
+                const shortage = finalTotal - cashAmount;
+                const customerName = document.getElementById('customerName').value || 'Pelanggan';
+                const confirmMessage = `Uang tunai kurang Rp ${shortage.toLocaleString()}. Apakah Anda ingin menyimpan kekurangan ini ke bon untuk ${customerName}?`;
+                
+                if (confirm(confirmMessage)) {
+                    // Simpan ke bon
+                    saveToBon(customerName, cart, total, discount, finalTotal, shortage);
+                    return;
+                } else {
+                    alert('Transaksi dibatalkan. Silakan masukkan uang yang cukup atau pilih metode pembayaran lain.');
+                    return;
+                }
             }
         }
 
@@ -848,21 +950,21 @@
         const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
 
         // Header
-        doc.setFontSize(16);
+        doc.setFontSize(14);
         doc.text('Laporan Penjualan - Toko Arrahma', 40, 40);
-        doc.setFontSize(11);
+        doc.setFontSize(14);
         doc.text(`Periode: ${start.toLocaleDateString('id-ID')} s.d. ${end.toLocaleDateString('id-ID')}`, 40, 60);
         doc.text(`Total Transaksi: ${totalTransaksi}`, 40, 76);
         doc.text(`Total Omzet: Rp ${totalOmzet.toLocaleString('id-ID')}`, 40, 92);
         const currentKasir = sessionStorage.getItem('kasir_email') || '-';
         doc.text(`Kasir: ${currentKasir}`, 40, 108);
 
-        // Detail per item: Tanggal, Pembeli, Barang, Qty, Harga, Subtotal
+        // Detail per item: Tanggal, Pembeli, Barang, Qty, Harga, Total
         if (typeof doc.autoTable !== 'function') {
             alert('Plugin AutoTable belum aktif. Muat ulang halaman dan coba lagi.');
             return;
         }
-        const head = [['Tanggal', 'Pembeli', 'Metode', 'Barang', 'Qty', 'Harga', 'Subtotal']];
+        const head = [['Tanggal', 'Pembeli', 'Metode', 'Barang', 'Qty', 'Harga', 'Total']];
         const body = [];
         let itemsGrandTotal = 0;
         trx.forEach(t => {
@@ -887,7 +989,7 @@
         });
         doc.autoTable({
             head, body, startY: 130,
-            styles: { fontSize: 8, overflow: 'linebreak', cellPadding: 3 }, headStyles: { fillColor: [52, 152, 219] },
+            styles: { fontSize: 14, overflow: 'linebreak', cellPadding: 3 }, headStyles: { fillColor: [52, 152, 219] },
             margin: { left: 40, right: 40 },
             tableWidth: 'wrap',
             columnStyles: {
@@ -897,15 +999,15 @@
                 3: { cellWidth: 140 },  // Barang
                 4: { cellWidth: 35, halign: 'right' }, // Qty
                 5: { cellWidth: 55, halign: 'right' }, // Harga
-                6: { cellWidth: 75, halign: 'right' }  // Subtotal
+                6: { cellWidth: 75, halign: 'right' }  // Total
             },
-            foot: [[ '', '', '', '', '', 'Subtotal', `Rp ${itemsGrandTotal.toLocaleString('id-ID')}` ]],
+            foot: [[ '', '', '', '', '', 'Total', `Rp ${itemsGrandTotal.toLocaleString('id-ID')}` ]],
             footStyles: { fillColor: [236, 240, 241], textColor: [44, 62, 80], fontStyle: 'bold' },
             didDrawPage: function() {
                 const pageSize = doc.internal.pageSize;
                 const pageWidth = pageSize.getWidth();
                 const pageNumber = doc.internal.getNumberOfPages();
-                doc.setFontSize(9);
+                doc.setFontSize(14);
                 doc.text(`Halaman ${pageNumber}`, pageWidth - 40, pageSize.getHeight() - 20, { align: 'right' });
             }
         });

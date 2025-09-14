@@ -171,7 +171,7 @@
             head,
             body,
             startY: 60,
-            styles: { fontSize: 10 },
+            styles: { fontSize: 14 },
             headStyles: { fillColor: [52, 152, 219] },
             columnStyles: {
                 0: { cellWidth: 320 },
@@ -181,7 +181,7 @@
                 const pageSize = doc.internal.pageSize;
                 const pageWidth = pageSize.getWidth();
                 const footer = `Halaman ${doc.internal.getNumberOfPages()}`;
-                doc.setFontSize(9);
+                doc.setFontSize(14);
                 doc.text(footer, pageWidth - 40, pageSize.getHeight() - 20, { align: 'right' });
             }
         });
